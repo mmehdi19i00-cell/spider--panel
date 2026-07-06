@@ -553,7 +553,7 @@ tr{animation:fadeIn .3s ease}
           <div class="set-row"><span class="set-lbl">Background Music</span>
             <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--txt2)">
               <input type="checkbox" id="audio-autoplay" checked onchange="togglePanelAudio()">
-              Auto-play music (static/panel_music.mp3)
+              Auto-play music (static/music-panel.mp3)
             </label>
           </div>
           <audio id="panel-audio-player" loop style="display:none"></audio>
@@ -1008,12 +1008,12 @@ function renderUsers() {
     html += '<td>' + statusBadge + '</td>';
     html += '<td><span class="badge badge-b">' + esc(inboundName) + '</span></td>';
     html += '<td><div class="act-row">';
-    html += '<button class="btn btn-sm btn-g" onclick="viewCfg(\'' + u.user_id + '\')" title="مشاهده کانفیگ">⚙️</button>';
-    html += '<button class="btn btn-sm btn-g" onclick="viewSub(\'' + u.username + '\')" title="لینک اشتراک">🔗</button>';
-    html += '<button class="btn btn-sm btn-b" onclick="viewQR(\'' + u.user_id + '\')" title="QR Code">📱</button>';
-    html += '<button class="btn btn-sm btn-b" onclick="editUser(\'' + u.user_id + '\')" title="ویرایش">✏️</button>';
-    html += '<button class="btn btn-sm btn-r" onclick="toggleUser(\'' + u.user_id + '\')" title="فعال/غیرفعال">🔄</button>';
-    html += '<button class="btn btn-sm btn-r" onclick="deleteUser(\'' + u.user_id + '\')" title="حذف">🗑️</button>';
+    html += '<button class="btn btn-sm btn-g" onclick="viewCfg(\'' + u.user_id + '\')" title="Config">'+iconCfg+'</button>';
+    html += '<button class="btn btn-sm btn-g" onclick="viewSub(\'' + u.username + '\')" title="Sub Link">'+iconLink+'</button>';
+    html += '<button class="btn btn-sm btn-b" onclick="viewQR(\'' + u.user_id + '\')" title="QR Code">'+iconQr+'</button>';
+    html += '<button class="btn btn-sm btn-b" onclick="editUser(\'' + u.user_id + '\')" title="Edit">'+iconEdit+'</button>';
+    html += '<button class="btn btn-sm btn-r" onclick="toggleUser(\'' + u.user_id + '\')" title="Toggle">'+iconToggle+'</button>';
+    html += '<button class="btn btn-sm btn-r" onclick="deleteUser(\'' + u.user_id + '\')" title="Delete">'+iconTrash+'</button>';
     html += '</div></td>';
     html += '</tr>';
   }
@@ -1482,20 +1482,20 @@ function buildConfig(){
   var output='',outEl=$id('cfgOutput'),preEl=$id('cfgPre'),label=$id('cfgOutLabel');
   if(currentCfgTab==='vless'){
     var links=entries.map(function(e,i){return 'vless://'+uuid+'@'+e.ip+':'+e.port+'?encryption=none&security='+security+'&sni='+sni+'&type='+network+'&path='+encodeURIComponent(wsPath)+'#CF-'+(i+1)+'-'+e.ip});
-    output=links.join('\\n');label.textContent='✅ '+links.length+' لینک VLESS ساخته شد';preEl.dataset.filename='vless-configs.txt';
+    output=links.join('\\n');label.textContent=iconCheck+' '+links.length+' VLESS links built';preEl.dataset.filename='vless-configs.txt';
   }else if(currentCfgTab==='vmess'){
     var links=entries.map(function(e,i){var obj={v:'2',ps:'CF-'+(i+1),add:e.ip,port:String(e.port),id:uuid,aid:'0',scy:'auto',net:network,type:'none',host:sni,path:wsPath,tls:security,sni:sni};return 'vmess://'+btoa(unescape(encodeURIComponent(JSON.stringify(obj))))});
-    output=links.join('\\n');label.textContent='✅ '+links.length+' لینک VMess ساخته شد';preEl.dataset.filename='vmess-configs.txt';
+    output=links.join('\\n');label.textContent=iconCheck+' '+links.length+' VMess links built';preEl.dataset.filename='vmess-configs.txt';
   }else if(currentCfgTab==='clash'){
     var pLines=entries.map(function(e,i){return '  - name: CF-'+(i+1)+'\\n    type: vless\\n    server: '+e.ip+'\\n    port: '+e.port+'\\n    uuid: '+uuid+'\\n    tls: '+(security==='tls'?'true':'false')+'\\n    servername: '+sni+'\\n    network: '+network+'\\n    ws-opts:\\n      path: '+wsPath+'\\n      headers:\\n        Host: '+sni});
     var names=entries.map(function(e,i){return 'CF-'+(i+1)});
-    output='proxies:\\n'+pLines.join('\\n')+'\\n\\nproxy-groups:\\n  - name: "♻️ Auto"\\n    type: url-test\\n    proxies:\\n      - '+names.join('\\n      - ')+'\\n    url: http://www.gstatic.com/generate_204\\n    interval: 300\\n\\nrules:\\n  - GEOIP,IR,DIRECT\\n  - MATCH,"♻️ Auto"';
-    label.textContent='✅ Clash YAML با '+entries.length+' پروکسی';preEl.dataset.filename='clash-config.yaml';
+    output='proxies:\\n'+pLines.join('\\n')+'\\n\\nproxy-groups:\\n  - name: iconRefresh+" Auto"\\n    type: url-test\\n    proxies:\\n      - '+names.join('\\n      - ')+'\\n    url: http://www.gstatic.com/generate_204\\n    interval: 300\\n\\nrules:\\n  - GEOIP,IR,DIRECT\\n  - MATCH,iconRefresh+" Auto"';
+    label.textContent=iconCheck+' Clash YAML with '+entries.length+' proxies';preEl.dataset.filename='clash-config.yaml';
   }else if(currentCfgTab==='singbox'){
     var outbounds=entries.map(function(e,i){return {type:'vless',tag:'cf-'+(i+1),server:e.ip,server_port:e.port,uuid:uuid,tls:{enabled:security==='tls',server_name:sni},transport:{type:network,path:wsPath}}});
     var tags=outbounds.map(function(o){return o.tag});
     output=JSON.stringify({inbounds:[{type:'socks',tag:'socks-in',listen:'127.0.0.1',listen_port:2080}],outbounds:outbounds.concat([{type:'urltest',tag:'auto',outbounds:tags,url:'http://www.gstatic.com/generate_204',interval:'5m'}])},null,2);
-    label.textContent='✅ Sing-Box با '+entries.length+' اتصال';preEl.dataset.filename='singbox-config.json';
+    label.textContent=iconCheck+' Sing-Box with '+entries.length+' connections';preEl.dataset.filename='singbox-config.json';
   }
   lastCfgContent=output;preEl.textContent=output;outEl.style.display='block';outEl.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
@@ -1553,6 +1553,14 @@ var iconUsers = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" str
 var iconTraffic = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>';
 var iconConn = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>';
 var iconUptime = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+var iconCfg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>';
+var iconLink = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>';
+var iconQr = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><line x1="14" y1="14" x2="14" y2="14.01"/><line x1="18" y1="14" x2="18" y2="14.01"/><line x1="21" y1="14" x2="21" y2="14.01"/><line x1="14" y1="17" x2="14" y2="17.01"/><line x1="16" y1="17" x2="16" y2="21"/><line x1="14" y1="21" x2="21" y2="21"/></svg>';
+var iconEdit = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+var iconToggle = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>';
+var iconTrash = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+var iconCheck = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+var iconRefresh = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>';
 
 // --- Neon Server Resource Bars ---
 var rwScannedRegions = [];
@@ -1630,7 +1638,7 @@ function rwDownloadCfg(){var t=rwBuiltConfigs.join('\n\n');var b=new Blob([t],{t
 
 // --- Panel Audio (auto-play from static folder) ---
 function togglePanelAudio(){var p=$id('panel-audio-player');if($id('audio-autoplay').checked){p.play().catch(function(){})}else{p.pause()};localStorage.setItem('spider_audio', $id('audio-autoplay').checked?'1':'0')}
-(function initPanelAudio(){var p=$id('panel-audio-player');p.src='/static/panel_music.mp3';p.volume=0.3;var saved=localStorage.getItem('spider_audio');$id('audio-autoplay').checked=saved!=='0';if(saved!=='0'){p.play().catch(function(){})}})();
+(function initPanelAudio(){var p=$id('panel-audio-player');p.src='/static/music-panel.mp3';p.volume=0.3;var saved=localStorage.getItem('spider_audio');$id('audio-autoplay').checked=saved!=='0';if(saved!=='0'){p.play().catch(function(){})}})();
 
 // Start neon bars when tab opens
 setTimeout(updateNeonBars, 500);
