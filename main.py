@@ -72,9 +72,12 @@ async def load_state():
             LINKS.update(data.get("links", {}))
             SUBS.update(data.get("subs", {}))
             USERS.update(data.get("users", {}))
-            # Only load password if saved with the SAME secret key
-            if "password_hash" in data and data.get("saved_secret") == CONFIG["secret"]:
+            # Always load saved password hash (no secret-key guard — causes password reset bugs)
+            if "password_hash" in data:
                 AUTH["password_hash"] = data["password_hash"]
+            # Also store saved_secret so future saves remain consistent
+            if "saved_secret" in data:
+                CONFIG["secret"] = data["saved_secret"]
             if "settings" in data:
                 SETTINGS.update(data["settings"])
             GROUPS.update(data.get("groups", {}))
