@@ -1181,26 +1181,43 @@ try:
     @app.websocket("/ws/{path:path}")
     async def ws_resolver(ws: WebSocket, path: str):
         clean = path.strip("/")
+        logger.info(f"WebSocket /ws/{clean} — resolving…")
+
+        # Special-case: /ws/live → live stats (registered later; caught here first)
+        if clean == "live":
+            logger.info(f"WebSocket /ws/live → delegating to live stats")
+            await websocket_live_stats(ws)
+            return
+
         # Try PATH_INDEX first (random path -> uuid)
         async with PATH_INDEX_LOCK:
             resolved = PATH_INDEX.get(clean)
         if resolved:
+            logger.info(f"WebSocket /ws/{clean} → resolved via PATH_INDEX → uuid={resolved[:8]}…")
             await websocket_tunnel(ws, resolved)
             return
+
         # Try as direct UUID (legacy clients using /ws/{uuid})
         import re
         if re.match(r'^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$', clean, re.I):
+            logger.info(f"WebSocket /ws/{clean} → resolved as UUID (legacy)")
             await websocket_tunnel(ws, clean)
             return
         if re.match(r'^[0-9a-f]{8,64}$', clean, re.I):
+            logger.info(f"WebSocket /ws/{clean} → resolved as hex UUID")
             await websocket_tunnel(ws, clean)
             return
-        # Also try as-is (might be stored with prefix)
+
+        # Also try stripping ws/ prefix (belt-and-suspenders)
         resolved2 = PATH_INDEX.get(clean.lstrip("ws/"))
         if resolved2:
+            logger.info(f"WebSocket /ws/{clean} → resolved via prefix-strip")
             await websocket_tunnel(ws, resolved2)
             return
-        logger.warning(f"WS rejected: unknown path /ws/{clean}")
+
+        # ── Unknown path: MUST accept before close, or client sees Status=0 ──
+        logger.warning(f"WebSocket rejected: unknown path /ws/{clean}")
+        await ws.accept()
         await ws.close(code=1008, reason="unknown path")
 
     logger.info("VLESS Relay module loaded (WS: /ws/{path})")

@@ -138,6 +138,7 @@ async def relay_tcp_to_ws(ws: WebSocket, reader: asyncio.StreamReader, conn_id: 
         logger.debug(f"TCP->WS end [{conn_id}]: {exc}")
 
 async def websocket_tunnel(ws: WebSocket, uuid: str):
+    logger.debug(f"websocket_tunnel: accepting /ws/… for uuid={uuid[:8]}…")
     await ws.accept()
     m = _get_main()
 
@@ -145,9 +146,11 @@ async def websocket_tunnel(ws: WebSocket, uuid: str):
         link = m.LINKS.get(uuid)
 
     if not m.is_link_allowed(link):
-        logger.warning(f"ðŸš« WS rejected uuid={uuid[:8]}â€¦ (not allowed)")
+        logger.warning(f"WS rejected uuid={uuid[:8]}… (link={'not found' if link is None else 'disabled/expired'})")
         await ws.close(code=1008, reason="not authorized")
         return
+
+    logger.info(f"WS accepted uuid={uuid[:8]}… link={link.get('label','?')}")
 
     ip = _ws_client_ip(ws)
     conn_id = secrets.token_urlsafe(6)
