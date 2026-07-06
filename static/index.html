@@ -28,10 +28,18 @@
   --tab-active-bg:#00ff41;--tab-active-color:#000;--tab-shadow:var(--tab-shadow);
   --nav-active-bg:rgba(0,255,65,.06);--nav-active-color:#00ff41;
   --orb1-bg:#00ff41;--orb2-bg:#00aa44;
-}
+}[data-accent="blue"]{
+  --bg:#06060e;--bg2:#0d0d1a;--bg3:#14142a;--txt:#d0d0e0;--txt2:#666690;
+  --red:#ff1744;--neon:#448aff;--purple:#7c4dff;--blue:#448aff;--green:#00e676;
+  --gold:#ffab00;--r:10px;--bg-opacity:0.08;--glow:0 0 24px rgba(68,138,255,.12);
+  --btn-grad:linear-gradient(135deg,#448aff,#2979ff);--btn-hov-glow:0 0 20px rgba(68,138,255,.35);
+  --login-title-grad:linear-gradient(135deg,#448aff,#7c4dff);--pbar-grad:linear-gradient(90deg,#448aff,#7c4dff);
+  --logo-shadow:drop-shadow(0 0 16px rgba(68,138,255,.4));--tab-active-bg:#448aff;--tab-active-color:#fff;
+  --orb1-bg:rgba(68,138,255,.1);--orb2-bg:rgba(124,77,255,.08);
+    --hdr-grad:linear-gradient(135deg,rgba(68,138,255,.12),rgba(124,77,255,.08));}
 [data-theme="light"][data-accent="red"],
 [data-theme="light"]:not([data-accent]){--bg:#f5f5f9;--bg2:#fff;--bg3:#e8e8f0;--txt:#1a1a2e;--txt2:#666680;--neon:#d50000;--bg-opacity:0.04;--glow:0 0 20px rgba(255,23,68,.08)}
-[data-theme="light"][data-accent="green"]{--bg:#f0f4f0;--bg2:#fff;--bg3:#e0f0e0;--txt:#0a1a0a;--txt2:#558855;--neon:#0a0;--bg-opacity:0.04;--glow:0 0 24px rgba(0,170,0,.08)}
+[data-theme="light"][data-accent="green"]{--bg:#f0f4f0;--bg2:#fff;--bg3:#e0f0e0;--txt:#0a1a0a;--txt2:#558855;--neon:#0a0;--bg-opacity:0.04;--glow:0 0 24px rgba(0,170,0,.08)}[data-theme="light"][data-accent="blue"]{--bg:#f0f2f8;--bg2:#fff;--bg3:#e0e4f0;--txt:#0a0a2a;--txt2:#556688;--neon:#448aff;--bg-opacity:0.04;--glow:0 0 24px rgba(68,138,255,.08)}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--txt);overflow-x:hidden}@media(max-width:900px){body{font-size:14px}input,select,button{font-size:16px!important}.btn{padding:10px 14px;font-size:12px}.btn-sm{padding:6px 10px;font-size:11px}td,th{padding:8px 4px;font-size:10px}.stat{padding:12px 8px}.stat-v{font-size:18px}.modal-c{max-width:95vw;padding:16px}.panel{padding:12px}.topbar{padding:10px 12px}.content{padding:10px}.stats{grid-template-columns:repeat(2,1fr);gap:8px}.main-area{margin-right:0}}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:var(--neon);border-radius:4px}
