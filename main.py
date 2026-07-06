@@ -93,26 +93,26 @@ async def load_state():
 def _rebuild_path_index():
     """Rebuild PATH_INDEX from all USERS and LINKS with stored paths."""
     PATH_INDEX.clear()
-    # From users
+    # From users — store clean path (no /ws/ prefix)
     for uid, u in USERS.items():
         path = (u.get("path") or "").strip().lstrip("/")
+        # Strip any old /ws/ prefix from stored paths
+        if path.startswith("ws/"):
+            path = path[3:]
         config_uuid = u.get("config_uuid") or uid
         if path:
             PATH_INDEX[path] = config_uuid
-            logger.debug(f"PATH_INDEX: /{path} -> user:{config_uuid[:8]}...")
-    # From legacy links (stored their UUID as path)
+    # From legacy links
     for lid, link in LINKS.items():
         link_path = (link.get("path") or "").strip().lstrip("/")
+        if link_path.startswith("ws/"):
+            link_path = link_path[3:]
         if link_path:
             PATH_INDEX[link_path] = lid
-    # Also index legacy ws paths from users (backward compat)
+    # Backward compat: index by config_uuid for old /ws/{uuid} clients
     for uid, u in USERS.items():
         config_uuid = u.get("config_uuid") or uid
-        # If config uses the old /ws/{uuid} format, index by uuid too
-        stored_path = (u.get("path") or "").strip().lstrip("/")
-        if not stored_path:
-            # No path set, still index by config_uuid for backward compat
-            PATH_INDEX[config_uuid] = config_uuid
+        PATH_INDEX[config_uuid] = config_uuid
     logger.info(f"PATH_INDEX rebuilt: {len(PATH_INDEX)} entries")
 
 async def save_state():
@@ -555,15 +555,18 @@ def generate_user_config(user_id: str, user: dict, inbound_id: str = None) -> st
             extra = quote('{"xPaddingBytes":"100-1000","mode":"auto","scMaxEachPostBytes":"1000000"}', safe='')
             params = f"encryption=none&security=tls&type=xhttp&host={quote(vless_host)}&path={quote(stored_path, safe='')}&sni={quote(sni)}&fp=chrome&alpn=h2,http/1.1&mode=auto&extra={extra}"
             return f"vless://{config_uuid}@{vless_host}:{vless_port}?{params}#{remark}"
-        else:  # ws — user's stored path (generated once at creation)
+        else:  # ws — prepend /ws/ prefix so client connects to /ws/{path}
             ws_host = (inbound.get("domain") if inbound else None) or SETTINGS.get("domain") or host
             ws_sni = sni if sni and sni != host else ws_host
+            # Normalize: strip any existing /ws/ or / prefix, then prepend /ws/
+            ws_path_raw = stored_path.strip("/").replace("ws/", "", 1) if stored_path.startswith("/ws/" if stored_path.startswith("/") else "ws/") else stored_path.strip("/")
+            ws_path = "/ws/" + ws_path_raw
             params = "&".join([
                 "encryption=none",
                 "security=tls",
                 f"type=ws",
                 f"host={quote(ws_host)}",
-                f"path={quote(stored_path, safe='')}",
+                f"path={quote(ws_path, safe='')}",
                 f"sni={quote(ws_sni)}",
                 "fp=chrome",
                 "alpn=http/1.1",
@@ -1172,37 +1175,35 @@ try:
         relay_tcp_to_ws,
         websocket_tunnel,
     )
-    # Old route: /ws/{uuid} — backward compatible
-    app.add_api_websocket_route("/ws/{uuid}", websocket_tunnel)
-
-    # New catch-all route: resolves random paths via PATH_INDEX
-    @app.websocket("/{path:path}")
-    async def ws_path_resolver(ws: WebSocket, path: str):
-        # Skip static files, api, and known routes
-        if path.startswith(("static/", "api/", "ws/", "sub/", "p/", "sub-group/", "xhttp-")):
-            await ws.close(code=1008, reason="invalid route")
-            return
-        # Strip path for lookup
-        clean_path = path.strip("/")
+    # WebSocket route: /ws/{path}
+    # Works for both old (/ws/{uuid}) and new (/ws/{random_path}) clients
+    # PATH_INDEX maps random_path -> config_uuid for resolution
+    @app.websocket("/ws/{path:path}")
+    async def ws_resolver(ws: WebSocket, path: str):
+        clean = path.strip("/")
         # Try PATH_INDEX first (random path -> uuid)
         async with PATH_INDEX_LOCK:
-            resolved_uuid = PATH_INDEX.get(clean_path)
-        if resolved_uuid:
-            await websocket_tunnel(ws, resolved_uuid)
+            resolved = PATH_INDEX.get(clean)
+        if resolved:
+            await websocket_tunnel(ws, resolved)
             return
-        # Fallback: try as direct UUID (for legacy clients)
+        # Try as direct UUID (legacy clients using /ws/{uuid})
         import re
-        if re.match(r'^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$', clean_path, re.I):
-            await websocket_tunnel(ws, clean_path)
+        if re.match(r'^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$', clean, re.I):
+            await websocket_tunnel(ws, clean)
             return
-        if re.match(r'^[0-9a-f]{8,64}$', clean_path, re.I):
-            await websocket_tunnel(ws, clean_path)
+        if re.match(r'^[0-9a-f]{8,64}$', clean, re.I):
+            await websocket_tunnel(ws, clean)
             return
-        # Not found
-        logger.warning(f"WS rejected: unknown path /{clean_path}")
+        # Also try as-is (might be stored with prefix)
+        resolved2 = PATH_INDEX.get(clean.lstrip("ws/"))
+        if resolved2:
+            await websocket_tunnel(ws, resolved2)
+            return
+        logger.warning(f"WS rejected: unknown path /ws/{clean}")
         await ws.close(code=1008, reason="unknown path")
 
-    logger.info("VLESS Relay module loaded (WS: /ws/{uuid} + catch-all)")
+    logger.info("VLESS Relay module loaded (WS: /ws/{path})")
 except (ImportError, ModuleNotFoundError) as e:
     logger.warning(f"VLESS Relay module not available: {e}")
 
