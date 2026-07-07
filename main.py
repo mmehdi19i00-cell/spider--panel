@@ -601,15 +601,32 @@ def generate_user_config(user_id: str, user: dict, inbound_id: str = None) -> st
         # Transport — inherited from inbound network (defaults to xhttp for Reality)
         rt = (inbound.get("network") if inbound else None) or "xhttp"
 
-        # Missing keys guard
+        # Auto-generate missing Reality keys on-the-fly (like 3x-ui does)
+        # Save back to inbound in background so next config call uses persisted keys
+        need_save = False
         if not reality_pbk or not reality_sid:
-            return (f"vless://{config_uuid}@{ext_domain}:{ext_port}"
-                    f"?encryption=none&security=reality"
-                    f"&sni={quote(sni_reality)}&fp={reality_fp}"
-                    f"&pbk=MISSING_PBK&sid=MISSING_SID"
-                    f"&spx={quote(reality_spx, safe='')}"
-                    f"&type={quote(rt)}"
-                    f"#{remark}")
+            if not reality_pbk:
+                priv, pub = generate_x25519_keys()
+                reality_pbk = pub
+                rs["public_key"] = pub
+                rs["private_key"] = priv
+                need_save = True
+            if not reality_sid:
+                reality_sid = secrets.token_hex(5)[:10]
+                rs["short_id"] = reality_sid
+                need_save = True
+            if not rs.get("spiderx"):
+                rs["spiderx"] = "/"
+            if not rs.get("dest"):
+                rs["dest"] = "is1-ssl.mzstatic.com:443"
+            # Persist back to inbound / settings
+            if need_save:
+                if inbound:
+                    inbound["reality_settings"] = rs
+                else:
+                    SETTINGS["reality"] = rs
+                asyncio.create_task(save_state())
+                logger.info(f"Auto-generated Reality keys for inbound={inbound.get('name','?') if inbound else 'global'}")
 
         # Build params matching 3x-ui applyShareRealityParams + applyXhttpExtraParams
         params_parts = [
