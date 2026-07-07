@@ -1092,31 +1092,7 @@ def generate_xray_server_config():
     return generate_xray_config()
 
 # End of file
-        "total_requests": stats["total_requests"],
-        "total_errors": stats["total_errors"],
-        "uptime": uptime(),
-        "timestamp": datetime.now().isoformat(),
-        "hourly": dict(hourly_traffic),
-        "recent_errors": list(error_logs)[-10:],
-        "links_count": len(snap),
-        "active_links": sum(1 for l in snap.values() if is_link_allowed(l)),
-        "expired_links": sum(1 for l in snap.values() if is_link_expired(l)),
-        "subs_count": len(SUBS),
-        # Enhanced stats
-        "active_users": active_users,
-        "total_configs": len(snap),
-        "total_users": total_users,
-        "traffic_usage_gb": traffic_usage_gb,
-        "server_status": server_status,
-        "cpu_percent": cpu_percent,
-        "ram_percent": ram_percent,
-        "disk_percent": disk_percent,
-        "network_mbps": network_mbps,
-        "recent_activity": list(activity_logs)[-10:],
-    }
 
-# ── Activity Logs ─────────────────────────────────────────────────────────────
-@app.get("/api/activity")
 async def get_activity(_=Depends(require_auth)):
     return {"logs": list(activity_logs)[-150:]}
 
