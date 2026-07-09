@@ -47,25 +47,32 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 # Set working directory
 WORKDIR /app
 
-# Copy Python packages from builder
+# Copy Python packages from builder (as root)
 COPY --from=builder /root/.local /home/appuser/.local
 
-# Copy Xray binary from builder (includes geoip.dat/geosite.dat if present in zip)
+# Copy Xray binary from builder
 COPY --from=builder /tmp/xray-build/extracted/xray /app/xray-core/xray
 
-# Copy geo assets if they exist in the extracted directory (ignore if missing)
+# Copy geo assets if they exist
 COPY --from=builder /tmp/xray-build/extracted/geoip.dat* /app/xray-assets/
 COPY --from=builder /tmp/xray-build/extracted/geosite.dat* /app/xray-assets/
 
-# Set permissions on Xray binary and assets
+# Create ALL required directories BEFORE switching user
+RUN mkdir -p /app/xray-core /app/xray-assets /app/xray-config /app/xray-logs
+
+# Set permissions on Xray binary and ALL directories (as root)
 RUN chmod +x /app/xray-core/xray \
-    && chown -R appuser:appuser /app/xray-core /app/xray-assets \
+    && chown -R appuser:appuser \
+       /app/xray-core \
+       /app/xray-assets \
+       /app/xray-config \
+       /app/xray-logs \
     && /app/xray-core/xray version
 
-# Copy application code
+# Copy application code with correct ownership
 COPY --chown=appuser:appuser . .
 
-# Switch to non-root user
+# NOW switch to non-root user (all root operations done)
 USER appuser
 
 # Add user site-packages to PATH
@@ -78,9 +85,6 @@ ENV PYTHONUNBUFFERED=1 \
     XRAY_CONFIG_PATH=/app/xray-config/config.json \
     XRAY_ASSETS_DIR=/app/xray-assets \
     XRAY_LOG_DIR=/app/xray-logs
-
-# Create directories for Xray config, assets, logs
-RUN mkdir -p /app/xray-config /app/xray-logs && chown -R appuser:appuser /app/xray-config /app/xray-logs
 
 # Expose port
 EXPOSE 8000
