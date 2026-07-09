@@ -13,7 +13,7 @@ import tempfile
 import logging
 import aiofiles
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import json
 import urllib.request
 import ssl
@@ -579,7 +579,7 @@ async def get_xray_logs(lines: int = 100) -> list:
 # ── Config Generation from Inbounds ──────────────────────────────────────────
 def generate_xray_config() -> Dict[str, Any]:
     """Generate Xray configuration from current inbounds state."""
-    from state import INBOUNDS
+    from core.state import INBOUNDS
     return generate_xray_config_from_inbounds(INBOUNDS)
 
 
@@ -613,7 +613,7 @@ def _build_inbound_config(ib: Dict[str, Any], iid: str, host: str) -> Optional[D
     fingerprint = ib.get("fingerprint", "chrome")
     
     # Collect clients from users assigned to this inbound
-    from state import USERS, USERS_LOCK
+    from core.state import USERS, USERS_LOCK
     
     # Build client list (this is called at startup, so lock is OK)
     clients = []
@@ -751,4 +751,4 @@ async def generate_self_signed_cert(domain: str, cert_path: Path, key_path: Path
 
 
 # ── Import state for INBOUNDS ────────────────────────────────────────────────
-from state import INBOUNDS, INBOUNDS_LOCK, save_state
+from core.state import INBOUNDS, INBOUNDS_LOCK, save_state

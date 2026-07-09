@@ -227,7 +227,7 @@ def resolve_reality_settings(inbound: Dict[str, Any]) -> Dict[str, Any]:
 
 def persist_reality_keys(inbound_id: str, private_key: str, public_key: str, short_id: str):
     """Persist Reality keys to inbound config and cache."""
-    from state import INBOUNDS, INBOUNDS_LOCK, save_state
+    from core.state import INBOUNDS, INBOUNDS_LOCK, save_state
     
     if inbound_id in INBOUNDS:
         rs = INBOUNDS[inbound_id].setdefault("reality_settings", {})
@@ -331,7 +331,7 @@ def generate_vless_link(uuid: str, remark: str = "Spider", inbound_id: str | Non
 # ── Xray Config Generation ─────────────────────────────────────────────────
 def generate_xray_server_config(inbound_id: Optional[str] = None) -> Dict[str, Any]:
     """Generate complete Xray server config.json from inbounds."""
-    from state import INBOUNDS
+    from core.state import INBOUNDS
     
     host = get_host()
     config = {
@@ -567,4 +567,4 @@ async def get_xray_status() -> Dict[str, Any]:
     return {"running": False, "pid": None}
 
 # ── Import state for INBOUNDS ────────────────────────────────────────────────
-from state import INBOUNDS, INBOUNDS_LOCK, save_state
+from core.state import INBOUNDS, INBOUNDS_LOCK, save_state

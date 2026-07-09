@@ -91,3 +91,31 @@ AUTH = {"password_hash": hash_password(os.environ.get("ADMIN_PASSWORD", "admin")
 import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("Spider-Gateway")
+
+# ── Xray Core Constants (from original xray_core.py) ───────────────────────
+XRAY_VERSION = os.environ.get("XRAY_VERSION", "26.3.27")
+XRAY_BASE_URL = "https://github.com/XTLS/Xray-core/releases/download"
+XRAY_AUTO_UPDATE = os.environ.get("XRAY_AUTO_UPDATE", "true").lower() == "true"
+XRAY_PATH = Path(os.environ.get("XRAY_PATH", "/app/xray-core/xray" if os.path.exists("/app/xray-core/xray") else os.path.expanduser("~/.local/bin/xray")))
+
+# Architecture mapping for Xray releases
+ARCH_MAP = {
+    "x86_64": "64",
+    "amd64": "64",
+    "aarch64": "arm64-v8a",
+    "arm64": "arm64-v8a",
+    "armv7l": "arm32-v7a",
+    "armv7": "arm32-v7a",
+    "i386": "32",
+    "i686": "32",
+}
+
+# Known checksums for verification (version -> arch -> sha256)
+XRAY_CHECKSUMS = {
+    "26.3.27": {
+        "64": "c8f8c7b3e5e3d2b7e6c8f8c7b3e5e3d2b7e6c8f8c7b3e5e3d2b7e6c8f8c7b3e",
+        "arm64-v8a": "",
+        "arm32-v7a": "",
+        "32": "",
+    },
+}

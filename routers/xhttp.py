@@ -8,10 +8,10 @@ from fastapi.responses import StreamingResponse
 from config import logger, IRAN_TZ, get_host
 from core.state import (
     LINKS, LINKS_LOCK, stats, hourly_traffic, connections, error_logs,
-    logger as state_logger, is_link_allowed, save_state,
+    is_link_allowed, save_state,
     PATH_INDEX, PATH_INDEX_LOCK,
 )
-from services.xray_service import parse_vless_header, check_and_use
+from services.relay_vless import parse_vless_header, check_and_use
 
 # ── Router ────────────────────────────────────────────────────────────────
 router = APIRouter(prefix="/xhttp", tags=["xhttp"])
