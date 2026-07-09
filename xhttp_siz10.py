@@ -1,10 +1,10 @@
-# xhttp_siz10.py
-# ══════════════════════════════════════════════════════════════════════════════
-# Siz10a · XHTTP Ultra Transport — دو مد: packet-up / stream-up
-#  (stream-one حذف شد. منطق relay_vless دست‌نخورده.
-#   stream-up بازنویسی شده با موتور تطبیقی: _AdaptiveFlow (AIMD روی high-water)
-#   + _QuotaGate تطبیقی (batch بر اساس نرخ واقعی هر سشن) + سوکت تیون‌شده)
-# ══════════════════════════════════════════════════════════════════════════════
+"""
+xhttp_siz10.py
+Siz10a · XHTTP Ultra Transport — دو مد: packet-up / stream-up
+(stream-one حذف شد. منطق relay_vless دست‌نخورده.
+  stream-up بازنویسی شده با موتور تطبیقی: _AdaptiveFlow (AIMD روی high-water)
+  + _QuotaGate تطبیقی (batch بر اساس نرخ واقعی هر سشن) + سوکت تیون‌شده)
+"""
 
 import asyncio
 import secrets
@@ -15,17 +15,17 @@ from datetime import datetime
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse
 
-from main import (
+from state import (
     LINKS,
     LINKS_LOCK,
     stats,
     hourly_traffic,
     connections,
     error_logs,
-    logger,
     is_link_allowed,
     save_state,
 )
+from config import logger
 from relay_vless import parse_vless_header, check_and_use
 
 router = APIRouter()
@@ -137,11 +137,11 @@ class _QuotaGate:
 
 class _AdaptiveFlow:
     """
-    high-water تطبیقی برای drain(), رفتار شبیه AIMD در TCP congestion control:
+    high-water تطبیقی برای drain()، رفتار شبیه AIMD در TCP congestion control:
       - هر بار drain() صدا زده می‌شه، مدت زمانش اندازه‌گیری می‌شه.
       - اگه سریع تموم بشه (لینک پایین‌دستی داره جواب می‌ده) → سقف بافر مجاز رو
         additive increase می‌کنیم؛ یعنی دفعه‌ی بعد دیرتر drain صدا زده می‌شه،
-        پس syscall/context-switch کمتر می‌شه و throughput واقعی بالا می‌ره.
+        پس syscall/context-switch کمتر می‌شه و throughput واقعی بالا میره.
       - اگه drain کند بشه (backpressure واقعیه، صف داره جمع می‌شه) → سقف رو فوری
         نصف می‌کنیم (multiplicative decrease) تا بافربلوت/لتنسی رشد نکنه.
     هر سشن یک نمونه‌ی جدا از این داره، پس مسیرهای کند و سریع تداخلی با هم ندارن.

@@ -1,6 +1,6 @@
 # relay_vless.py
-# بخش VLESS Relay — جدا شده از main.py
-# از _get_main() برای دسترسی به main.LINKS استفاده می‌کند (جلوگیری از circular import)
+# VLESS Relay — moved from main.py, uses state.py for all shared state
+# No circular imports - imports only from state and config
 
 import asyncio
 import secrets
@@ -9,29 +9,26 @@ from datetime import datetime, timezone, timedelta
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-# ── Shared state (used directly; main.py populates these) ──
-from shared import (
+# ── Shared state ──────────────────────────────────────────────────────────
+from state import (
     stats,
     hourly_traffic,
     connections,
     error_logs,
-    RELAY_BUF,
+    LINKS,
+    LINKS_LOCK,
+    USERS,
+    USERS_LOCK,
+    is_link_allowed,
+    save_state,
+    log_activity,
+    IRAN_TZ,
 )
 
 logger = logging.getLogger("Spider-Gateway")
-IRAN_TZ = timezone(timedelta(hours=3, minutes=30))
-
-# ── Lazy access to main module (avoids circular import) ──
-_main = None
-
-def _get_main():
-    global _main
-    if _main is None:
-        import main as _main
-    return _main
 
 # ══════════════════════════════════════════════════════════════════════════════
-# VLESS Relay — بهینه‌شده برای حداکثر throughput
+# VLESS Relay — optimized for maximum throughput
 # ══════════════════════════════════════════════════════════════════════════════
 
 RELAY_BUF_LOCAL = 256 * 1024
@@ -67,22 +64,21 @@ async def parse_vless_header(chunk: bytes):
     return command, address, port, chunk[pos:]
 
 async def check_and_use(uid: str, n: int) -> bool:
-    m = _get_main()
-    async with m.LINKS_LOCK:
-        link = m.LINKS.get(uid)
+    async with LINKS_LOCK:
+        link = LINKS.get(uid)
         if link is None:
             return False
-        if not m.is_link_allowed(link):
+        if not is_link_allowed(link):
             return False
         link["used_bytes"] += n
         stats["total_bytes"] += n
-        hourly_traffic[m.now_ir().strftime("%H:00")] += n
+        hourly_traffic[datetime.now(IRAN_TZ).strftime("%H:00")] += n
 
     # Sync traffic back to user (so subscription page shows real usage)
     user_id = link.get("user_id")
     if user_id:
-        async with m.USERS_LOCK:
-            u = m.USERS.get(user_id)
+        async with USERS_LOCK:
+            u = USERS.get(user_id)
             if u:
                 u["traffic_used_bytes"] = u.get("traffic_used_bytes", 0) + n
 
@@ -132,12 +128,11 @@ async def relay_tcp_to_ws(ws: WebSocket, reader: asyncio.StreamReader, conn_id: 
 
 async def websocket_tunnel(ws: WebSocket, uuid: str):
     await ws.accept()
-    m = _get_main()
 
-    async with m.LINKS_LOCK:
-        link = m.LINKS.get(uuid)
+    async with LINKS_LOCK:
+        link = LINKS.get(uuid)
 
-    if not m.is_link_allowed(link):
+    if not is_link_allowed(link):
         logger.warning(f"WS rejected uuid={uuid[:8]}… (link={'not found' if link is None else 'disabled/expired'})")
         await ws.close(code=1008, reason="not authorized")
         return
@@ -152,7 +147,7 @@ async def websocket_tunnel(ws: WebSocket, uuid: str):
         "bytes": 0,
     }
     logger.info(f"WS [{conn_id}] uuid={uuid[:8]}… ip={ip} total={len(connections)}")
-    m.log_activity("connection", f"اتصال جدید از {ip} (کانفیگ {link.get('label','?')})", "info")
+    log_activity("connection", f"اتصال جدید از {ip} (کانفیگ {link.get('label','?')})", "info")
     writer = None
 
     try:
@@ -200,7 +195,7 @@ async def websocket_tunnel(ws: WebSocket, uuid: str):
             except asyncio.CancelledError:
                 pass
 
-        asyncio.create_task(m.save_state())
+        asyncio.create_task(save_state())
 
     except WebSocketDisconnect:
         pass
@@ -220,3 +215,12 @@ async def websocket_tunnel(ws: WebSocket, uuid: str):
                 pass
         connections.pop(conn_id, None)
         logger.info(f"WS closed [{conn_id}] total={len(connections)}")
+
+def _ws_client_ip(ws: WebSocket) -> str:
+    fwd = ws.headers.get("x-forwarded-for")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    real_ip = ws.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    return ws.client.host if ws.client else "نامشخص"

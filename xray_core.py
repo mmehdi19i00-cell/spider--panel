@@ -1,37 +1,13 @@
-# xray_core.py
-# Xray Core Management: Download, Install, Verify, Process Control
-# Production-ready for Railway deployment
-
+"""
+Xray Core Management: Download, Install, Verify, Process Control
+No FastAPI or main.py dependencies - pure service layer.
+"""
 import asyncio
 import hashlib
 import os
 import platform
 import shutil
 import subprocess
-
-async def run_cmd(cmd, cwd=None, env=None, timeout=None):
-    """Run a command asynchronously, capturing stdout and stderr.
-    Returns dict with keys: code, stdout, stderr.
-    """
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=cwd,
-            env=env,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-        except asyncio.TimeoutError:
-            proc.kill()
-            await proc.wait()
-            return {"code": -1, "stdout": "", "stderr": "Command timed out"}
-        return {"code": proc.returncode, "stdout": stdout.decode(errors='ignore'), "stderr": stderr.decode(errors='ignore')}
-    except FileNotFoundError as e:
-        return {"code": 127, "stdout": "", "stderr": str(e)}
-    except Exception as e:
-        return {"code": -1, "stdout": "", "stderr": str(e)}
 import sys
 import tempfile
 import logging
@@ -42,41 +18,13 @@ import json
 import urllib.request
 import ssl
 
-logger = logging.getLogger("Spider-Xray")
-
-# ── Constants ─────────────────────────────────────────────────────────────────
-XRAY_VERSION = os.environ.get("XRAY_VERSION", "26.3.27")  # Latest stable as of 2026
-
-XRAY_BASE_URL = "https://github.com/XTLS/Xray-core/releases/download"
-XRAY_AUTO_UPDATE = os.environ.get("XRAY_AUTO_UPDATE", "true").lower() == "true"
-# In Docker/Railway, binary is at /app/xray-core/xray; locally use ~/.local/bin/xray
-XRAY_PATH = Path(os.environ.get("XRAY_PATH", "/app/xray-core/xray" if os.path.exists("/app/xray-core/xray") else os.path.expanduser("~/.local/bin/xray")))
-XRAY_CONFIG_PATH = Path(os.environ.get("XRAY_CONFIG_PATH", "/app/xray-config/config.json" if os.path.exists("/app/xray-config") else os.path.expanduser("~/.config/xray/config.json")))
-XRAY_LOG_DIR = Path(os.environ.get("XRAY_LOG_DIR", "/app/xray-logs" if os.path.exists("/app/xray-logs") else os.path.expanduser("~/.local/share/xray/logs")))
-XRAY_ASSETS_DIR = Path(os.environ.get("XRAY_ASSETS_DIR", "/app/xray-assets" if os.path.exists("/app/xray-assets") else os.path.expanduser("~/.local/share/xray")))
-
-# Architecture mapping for Xray releases
-ARCH_MAP = {
-    "x86_64": "64",
-    "amd64": "64",
-    "aarch64": "arm64-v8a",
-    "arm64": "arm64-v8a",
-    "armv7l": "arm32-v7a",
-    "armv7": "arm32-v7a",
-    "i386": "32",
-    "i686": "32",
-}
-
-# Known checksums for verification (SHA256). The dict may be empty; if a checksum for the requested version
-# and architecture is not present, verification will be skipped (warning logged).
-XRAY_CHECKSUMS: dict[str, dict[str, str]] = {}
-
-# Global state
-_xray_process: Optional[asyncio.subprocess.Process] = None
-_xray_restart_task: Optional[asyncio.Task] = None
-_xray_monitor_task: Optional[asyncio.Task] = None
-_xray_lock = asyncio.Lock()
-_xray_config_lock = asyncio.Lock()
+from config import (
+    logger,
+    XRAY_VERSION, XRAY_BASE_URL, XRAY_AUTO_UPDATE,
+    XRAY_PATH, XRAY_CONFIG_PATH, XRAY_LOG_DIR, XRAY_ASSETS_DIR,
+    ARCH_MAP,
+    XRAY_CHECKSUMS,
+)
 
 # ── Architecture Detection ───────────────────────────────────────────────────
 def detect_arch() -> str:
@@ -429,8 +377,30 @@ async def validate_xray_config(config: Dict[str, Any] = None) -> tuple[bool, str
 
 
 # ── Process Control ──────────────────────────────────────────────────────────
-# run_cmd is defined earlier in this file (async version). This duplicate definition removed.
-
+async def run_cmd(cmd: List[str], cwd: Optional[str] = None, timeout: int = 30) -> Dict[str, Any]:
+    """Run a command and return {code, stdout, stderr}."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            return {"code": -1, "stdout": "", "stderr": "Command timed out"}
+        return {
+            "code": proc.returncode,
+            "stdout": stdout.decode("utf-8", errors="replace").strip(),
+            "stderr": stderr.decode("utf-8", errors="replace").strip(),
+        }
+    except FileNotFoundError as e:
+        return {"code": 127, "stdout": "", "stderr": str(e)}
+    except Exception as e:
+        return {"code": -1, "stdout": "", "stderr": str(e)}
 
 
 async def start_xray(config: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -449,7 +419,7 @@ async def start_xray(config: Dict[str, Any] = None) -> Dict[str, Any]:
         
         # Use provided config or generate from inbounds
         if config is None:
-            from main import generate_xray_server_config
+            from services.xray_service import generate_xray_server_config
             config = generate_xray_server_config()
         
         # Validate config before starting
@@ -552,7 +522,7 @@ async def reload_xray_config(config: Dict[str, Any] = None) -> Dict[str, Any]:
 
 
 async def _read_xray_logs(stream: asyncio.StreamReader, stream_name: str):
-    """Read Xray stdout/stderr and log."""
+    """Read and log Xray output."""
     try:
         while True:
             line = await stream.readline()
@@ -575,7 +545,6 @@ async def _monitor_xray_process():
             if _xray_process.returncode is not None:
                 logger.warning(f"Xray process exited with code {_xray_process.returncode}")
                 # Auto-restart if enabled
-                from main import SETTINGS
                 if SETTINGS.get("xray_auto_restart", True):
                     logger.info("Auto-restarting Xray...")
                     await asyncio.sleep(2)
@@ -610,67 +579,14 @@ async def get_xray_logs(lines: int = 100) -> list:
 # ── Config Generation from Inbounds ──────────────────────────────────────────
 def generate_xray_config() -> Dict[str, Any]:
     """Generate Xray configuration from current inbounds state."""
-    from shared import INBOUNDS
-    # Ensure we have the latest inbound definitions
-    config = generate_xray_config_from_inbounds(INBOUNDS)
-    # Process reality inbounds: generate keys if missing
-    for inbound in config.get("inbounds", []):
-        if inbound.get("protocol") == "reality":
-            rs = inbound.get("streamSettings", {}).get("realitySettings", {})
-            # Get the inbound_id to find the source inbound for persistent keys
-            inbound_tag = inbound.get("tag", "")
-            inbound_id = inbound_tag.replace("inbound-", "") if inbound_tag.startswith("inbound-") else ""
-            
-            # Check if keys already exist in the source inbound (persistent storage)
-            source_ib = INBOUNDS.get(inbound_id, {})
-            source_rs = source_ib.get("reality_settings", {})
-            
-            if not rs.get("privateKey") or not rs.get("publicKey"):
-                # Try to use persisted keys first
-                if source_rs.get("private_key") and source_rs.get("public_key"):
-                    rs["privateKey"] = source_rs.get("private_key")
-                    rs["publicKey"] = source_rs.get("public_key")
-                else:
-                    # Generate X25519 key pair using Xray binary
-                    result = asyncio.run(run_cmd([str(XRAY_PATH), "x25519"]))
-                    if result["code"] == 0:
-                        # Parse output lines (expect "PrivateKey: <...>" etc.)
-                        priv = ""
-                        pub = ""
-                        for line in result["stdout"].splitlines():
-                            if "PrivateKey" in line:
-                                priv = line.split(":", 1)[1].strip()
-                            if "PublicKey" in line:
-                                pub = line.split(":", 1)[1].strip()
-                        if priv and pub:
-                            rs["privateKey"] = priv
-                            rs["publicKey"] = pub
-                            # Persist keys back to source inbound
-                            if inbound_id and inbound_id in INBOUNDS:
-                                INBOUNDS[inbound_id].setdefault("reality_settings", {})["private_key"] = priv
-                                INBOUNDS[inbound_id]["reality_settings"]["public_key"] = pub
-                    else:
-                        logger.warning("Failed to generate X25519 keys for reality inbound")
-            
-            if not rs.get("shortIds"):
-                # Try to use persisted shortId first
-                if source_rs.get("short_id"):
-                    rs["shortIds"] = [source_rs.get("short_id")]
-                else:
-                    import secrets
-                    short_id = secrets.token_hex(4)  # 8-char hex
-                    rs["shortIds"] = [short_id]
-                    # Persist shortId back to source inbound
-                    if inbound_id and inbound_id in INBOUNDS:
-                        INBOUNDS[inbound_id].setdefault("reality_settings", {})["short_id"] = short_id
-    # Return the built config
-    return config
+    from state import INBOUNDS
+    return generate_xray_config_from_inbounds(INBOUNDS)
+
 
 def generate_xray_config_from_inbounds(inbounds: Dict[str, Any]) -> Dict[str, Any]:
-    """Create Xray config dict from inbound definitions.
-    This replaces the missing helper previously referenced.
-    """
-    host = os.getenv("RAILWAY_PUBLIC_DOMAIN", "localhost")
+    """Create Xray config dict from inbound definitions."""
+    from config import get_host
+    host = get_host()
     cfg: Dict[str, Any] = {
         "log": {"loglevel": "warning"},
         "inbounds": [],
@@ -697,7 +613,12 @@ def _build_inbound_config(ib: Dict[str, Any], iid: str, host: str) -> Optional[D
     fingerprint = ib.get("fingerprint", "chrome")
     
     # Collect clients from users assigned to this inbound
-    clients = _get_inbound_clients(iid)
+    from state import USERS, USERS_LOCK
+    
+    # Build client list (this is called at startup, so lock is OK)
+    clients = []
+    # For now, return empty - will be populated by the API at runtime
+    # Real clients are added via the API
     
     inbound_obj = {
         "tag": f"inbound-{iid}",
@@ -746,7 +667,6 @@ def _build_inbound_config(ib: Dict[str, Any], iid: str, host: str) -> Optional[D
     
     # TLS protocol
     elif security == "tls":
-        # Get certificate paths
         cert_file = ib.get("cert_file", "/etc/xray/cert.pem")
         key_file = ib.get("key_file", "/etc/xray/key.pem")
         
@@ -798,42 +718,9 @@ def _build_inbound_config(ib: Dict[str, Any], iid: str, host: str) -> Optional[D
 
 def _get_inbound_clients(inbound_id: str) -> list:
     """Get clients for a specific inbound from USERS."""
-    # This will be populated at runtime from main.USERS
-    # For now return empty - will be filled by the API
+    # This will be populated at runtime from the API
+    # For now return empty - real clients are added via the API
     return []
-
-
-# ── Import aiofiles at top level ─────────────────────────────────────────────
-try:
-    import aiofiles
-except ImportError:
-    # Create minimal aiofiles-like interface for config writing
-    class _Aiofiles:
-        @staticmethod
-        async def open(path, mode="r", **kwargs):
-            return _AsyncFile(path, mode)
-    
-    class _AsyncFile:
-        def __init__(self, path, mode):
-            self.path = path
-            self.mode = mode
-            self.file = None
-        
-        async def __aenter__(self):
-            self.file = open(self.path, self.mode)
-            return self
-        
-        async def __aexit__(self, *args):
-            if self.file:
-                self.file.close()
-        
-        async def write(self, data):
-            self.file.write(data)
-        
-        async def read(self):
-            return self.file.read()
-    
-    aiofiles = _Aiofiles()
 
 
 # ── Certificate Management ───────────────────────────────────────────────────
@@ -847,120 +734,21 @@ async def generate_self_signed_cert(domain: str, cert_path: Path, key_path: Path
             "openssl", "req", "-x509", "-newkey", "rsa:2048",
             "-keyout", str(key_path),
             "-out", str(cert_path),
-            "-days", "365",
-            "-nodes",
+            "-days", "365", "-nodes",
             "-subj", f"/CN={domain}",
-            "-addext", f"subjectAltName=DNS:{domain}",
         ]
         
         result = await run_cmd(cmd)
-        if result["code"] == 0:
-            logger.info(f"Generated self-signed cert for {domain}")
-            return True
-        else:
-            logger.error(f"Failed to generate cert: {result['stderr']}")
+        if result["code"] != 0:
+            logger.error(f"Certificate generation failed: {result['stderr']}")
             return False
+        
+        logger.info(f"Generated self-signed cert for {domain}")
+        return True
     except Exception as e:
         logger.error(f"Certificate generation error: {e}")
         return False
 
 
-async def ensure_tls_certificates(domain: str) -> tuple[Path, Path]:
-    """Ensure TLS certificates exist for domain."""
-    cert_dir = Path("/etc/xray")
-    cert_path = cert_dir / "cert.pem"
-    key_path = cert_dir / "key.pem"
-    
-    if cert_path.exists() and key_path.exists():
-        return cert_path, key_path
-    
-    # Try to get from Let's Encrypt if on Railway with custom domain
-    # For now, generate self-signed
-    await generate_self_signed_cert(domain, cert_path, key_path)
-    return cert_path, key_path
-
-
-# ── Xray Update ──────────────────────────────────────────────────────────────
-async def update_xray_core() -> Dict[str, Any]:
-    """Update Xray Core to latest version."""
-    # Get latest version from GitHub API
-    try:
-        import urllib.request
-        import json as json_lib
-        
-        url = "https://api.github.com/repos/XTLS/Xray-core/releases/latest"
-        req = urllib.request.Request(url, headers={"User-Agent": "Spider-Panel"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json_lib.load(resp)
-            latest_version = data["tag_name"].lstrip("v")
-    except Exception as e:
-        logger.error(f"Failed to check latest version: {e}")
-        return {"ok": False, "error": "Failed to check latest version"}
-    
-    current = await get_xray_version()
-    if current == latest_version:
-        return {"ok": True, "message": f"Already at latest version {current}", "version": current}
-    
-    logger.info(f"Updating Xray from {current} to {latest_version}")
-    success = await install_xray_core(latest_version, force=True)
-    
-    if success:
-        # Restart Xray with new binary
-        await restart_xray()
-        return {"ok": True, "message": f"Updated to {latest_version}", "version": latest_version}
-    else:
-        return {"ok": False, "error": "Update failed"}
-
-
-# ── Initialize on Import ─────────────────────────────────────────────────────
-async def initialize_xray():
-    """Initialize Xray on startup."""
-    logger.info("Initializing Xray Core...")
-    
-    # Install if missing
-    if not await is_xray_installed():
-        logger.info("Xray not found, installing...")
-        await install_xray_core()
-    
-    # Create default config if none exists
-    if not XRAY_CONFIG_PATH.exists():
-        # In absence of the full application state, create a minimal placeholder config.
-        placeholder = {
-            "log": {"loglevel": "warning"},
-            "inbounds": [],
-            "outbounds": [{"protocol": "freedom", "tag": "direct"}],
-        }
-        await write_xray_config(placeholder)
-    
-    # Auto-start if enabled – attempt to import SETTINGS safely
-    try:
-        from main import SETTINGS
-        if SETTINGS.get("xray_auto_start", True):
-            await start_xray()
-    except Exception as e:
-        logger.warning(f"Skipping auto-start due to import error: {e}")
-    
-    logger.info("Xray initialization complete")
-
-
-# Export for use in main.py
-__all__ = [
-    "install_xray_core",
-    "get_xray_version",
-    "is_xray_installed",
-    "get_xray_status",
-    "start_xray",
-    "stop_xray",
-    "restart_xray",
-    "generate_xray_config",
-    "validate_xray_config",
-    "write_xray_config",
-    "read_xray_config",
-    "get_xray_logs",
-    "update_xray_core",
-    "initialize_xray",
-    "ensure_tls_certificates",
-    "XRAY_PATH",
-    "XRAY_CONFIG_PATH",
-    "XRAY_VERSION",
-]
+# ── Import state for INBOUNDS ────────────────────────────────────────────────
+from state import INBOUNDS, INBOUNDS_LOCK, save_state
