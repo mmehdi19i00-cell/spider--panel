@@ -8,12 +8,43 @@
 :root{--bg:#06060e;--bg2:#0d0d1a;--bg3:#14142a;--bg4:#1a1a30;--txt:#e0e0f0;--txt2:#7070a0;
   --neon:#ff1744;--g2:#00e676;--gold:#ffab00;--blue:#448aff;--purple:#7c4dff;--r:12px}
 
-/* Light theme */
-[data-theme="light"]{--bg:#f5f5f5;--bg2:#ffffff;--bg3:#e8e8e8;--bg4:#dddddd;--txt:#111111;--txt2:#555555;
-  --neon:#cc0000;--g2:#00a340;--gold:#cc8800;--blue:#3366cc;--purple:#6633cc}
-[data-theme="light"] .card{box-shadow:0 0 20px rgba(0,0,0,.08)}
-[data-theme="light"] .cfg-v{background:rgba(0,0,0,.04);color:#222}
-[data-theme="light"] .hdr{background:linear-gradient(135deg,rgba(204,0,0,.06),rgba(102,51,204,.04))}
+/* Light theme — bright, solid white, modern (no glass). Motion blur on accent. */
+[data-theme="light"]{
+  --bg:#ffffff;--bg2:#ffffff;--bg3:#f1f3f7;--bg4:#e6e9f0;--txt:#10131a;--txt2:#5b6472;
+  --neon:#e0244e;--g2:#10a35a;--gold:#b9790a;--blue:#2f6fed;--purple:#6b3fd6;--r:14px;
+}
+[data-theme="light"] body{
+  background:#ffffff;
+  background-image:
+    radial-gradient(1200px 600px at 12% -8%, rgba(47,111,237,.10), transparent 60%),
+    radial-gradient(1000px 520px at 88% 4%, rgba(224,36,78,.08), transparent 60%),
+    radial-gradient(900px 600px at 50% 110%, rgba(107,63,214,.08), transparent 60%);
+}
+[data-theme="light"] .card{
+  background:#ffffff;
+  border:1px solid #e8ebf1;
+  box-shadow:0 18px 50px rgba(18,24,40,.10);
+  backdrop-filter:none;
+}
+[data-theme="light"] .cfg-v{background:#f4f6fb;color:#10131a;border:1px solid #e8ebf1}
+[data-theme="light"] .hdr{background:linear-gradient(135deg,#ffffff,#f4f6fb);border-bottom:1px solid #eef1f6}
+[data-theme="light"] .sbar-item{background:#f4f6fb;color:#10131a}
+[data-theme="light"] .ap-c{background:#ffffff;border:1px solid #e8ebf1}
+[data-theme="light"] .st{background:#f4f6fb;border:1px solid #e8ebf1}
+[data-theme="light"] .btn-n,[data-theme="light"] .btn-g{background:#f4f6fb;color:#10131a}
+[data-theme="light"] .ping-b{background:#f4f6fb;color:#10131a}
+/* motion blur: accent glow that drifts (motion) + blur for a soft, modern feel */
+[data-theme="light"] .hdr-av{
+  background:linear-gradient(135deg,var(--neon),var(--purple));
+  box-shadow:0 8px 30px rgba(224,36,78,.35);
+  animation:motionBlur 6s ease-in-out infinite;
+  filter:blur(.2px);
+}
+@keyframes motionBlur{
+  0%,100%{transform:translateY(0);box-shadow:0 8px 30px rgba(224,36,78,.30)}
+  50%{transform:translateY(-4px);box-shadow:0 18px 46px rgba(47,111,237,.34)}
+}
+
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;overflow-x:hidden;display:flex;flex-direction:column;align-items:center}
 
@@ -129,6 +160,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 <div class="ft">Powered by <a href="/spider" target="_blank">Spider Panel</a></div>
 
 <script>
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;')}
 var uname=window.location.pathname.split('/').pop();
 // Prefer ?uuid= when opened as the rich viewer (/sub?uuid=...), else fall back
 // to the path segment (legacy /sub/{username}).

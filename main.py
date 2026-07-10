@@ -64,7 +64,16 @@ TELEGRAM_FLAG_FILE = DATA_DIR / "telegram_seen.flag"
 TELEGRAM_LINK_FILE = BASE_DIR / "data" / "link.txt"
 
 # ── FastAPI App ────────────────────────────────────────────────────────────
-app = FastAPI(title="Spider Gateway", docs_url=None, redoc_url=None)
+@asynccontextmanager
+async def lifespan(app: "FastAPI"):
+    # Startup: load state, seed default domain, ensure Xray is running.
+    await startup()
+    yield
+    # Shutdown: persist state and close shared HTTP client.
+    await shutdown()
+
+
+app = FastAPI(title="Spider Gateway", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 # CORS
 app.add_middleware(
@@ -110,7 +119,6 @@ async def _json_unhandled_handler(request: Request, exc: Exception):
 http_client: httpx.AsyncClient | None = None
 
 # ── Startup / Shutdown ─────────────────────────────────────────────────────
-@app.on_event("startup")
 async def startup():
     global http_client, stats
     limits = httpx.Limits(max_connections=500, max_keepalive_connections=100)
@@ -197,7 +205,6 @@ async def startup():
     logger.info(f"Spider Gateway v9.2 started on port {CONFIG['port']}")
 
 
-@app.on_event("shutdown")
 async def shutdown():
     await save_state()
     if http_client:

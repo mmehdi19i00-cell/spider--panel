@@ -36,10 +36,81 @@
   --border-glow:rgba(68,138,255,.2);--input-glow:rgba(68,138,255,.15);
   --orb1:rgba(68,138,255,.12);--orb2:rgba(124,77,255,.08);
 }
+/* Light theme — bright, solid white, modern. No glass blur; crisp cards
+   with soft shadows. Accent motion-blur on brand + active nav. */
 [data-theme="light"][data-accent="red"],
-[data-theme="light"]:not([data-accent]){--bg:#f0f0f5;--bg2:rgba(255,255,255,.9);--bg3:rgba(240,240,248,.8);--txt:#1a1a2e;--txt2:#555570;--neon:#d50000;--bg-opacity:0.03;--glow:0 0 20px rgba(213,0,0,.1);--glass:rgba(255,255,255,.8)}
-[data-theme="light"][data-accent="green"]{--bg:#edf5ed;--bg2:rgba(255,255,255,.9);--bg3:rgba(232,245,232,.8);--txt:#0a1a0a;--txt2:#447744;--neon:#0a0;--bg-opacity:0.03;--glow:0 0 20px rgba(0,170,0,.1);--glass:rgba(255,255,255,.8)}
-[data-theme="light"][data-accent="blue"]{--bg:#edf0f8;--bg2:rgba(255,255,255,.9);--bg3:rgba(232,236,248,.8);--txt:#0a0a2a;--txt2:#445588;--neon:#448aff;--bg-opacity:0.03;--glow:0 0 20px rgba(68,138,255,.1);--glass:rgba(255,255,255,.8)}
+[data-theme="light"]:not([data-accent]){
+  --bg:#ffffff;--bg2:#ffffff;--bg3:#f1f3f7;--bg4:#e6e9f0;
+  --txt:#10131a;--txt2:#5b6472;--neon:#e0244e;--neon2:#ef476f;
+  --purple:#6b3fd6;--blue:#2f6fed;--green:#10a35a;--gold:#b9790a;
+  --r:14px;--bg-opacity:0;--glow:0 10px 30px rgba(224,36,78,.14);
+  --glow-strong:0 16px 44px rgba(224,36,78,.22);
+  --grad1:#e0244e;--grad2:#6b3fd6;--grad:linear-gradient(135deg,#e0244e,#6b3fd6);
+  --logo-shadow:drop-shadow(0 6px 18px rgba(224,36,78,.28));
+  --tab-bg:#e0244e;--tab-color:#fff;--tab-glow:0 8px 22px rgba(224,36,78,.32);
+  --nav-bg:rgba(224,36,78,.08);--nav-color:#e0244e;
+  --border-glow:rgba(224,36,78,.18);--input-glow:rgba(224,36,78,.12);
+  --glass:#ffffff;--card-border:#e8ebf1;
+}
+[data-theme="light"][data-accent="green"]{
+  --bg:#ffffff;--bg2:#ffffff;--bg3:#eef6f0;--bg4:#e1ede6;
+  --txt:#0c1a10;--txt2:#4a6b54;--neon:#10a35a;--neon2:#37c97c;
+  --purple:#1f8f5f;--blue:#2f6fed;--green:#10a35a;--gold:#b9790a;
+  --r:14px;--bg-opacity:0;--glow:0 10px 30px rgba(16,163,90,.14);
+  --glow-strong:0 16px 44px rgba(16,163,90,.22);
+  --grad1:#10a35a;--grad2:#1f8f5f;--grad:linear-gradient(135deg,#10a35a,#1f8f5f);
+  --logo-shadow:drop-shadow(0 6px 18px rgba(16,163,90,.28));
+  --tab-bg:#10a35a;--tab-color:#fff;--tab-glow:0 8px 22px rgba(16,163,90,.32);
+  --nav-bg:rgba(16,163,90,.08);--nav-color:#10a35a;
+  --border-glow:rgba(16,163,90,.18);--input-glow:rgba(16,163,90,.12);
+  --glass:#ffffff;--card-border:#e1ede6;
+}
+[data-theme="light"][data-accent="blue"]{
+  --bg:#ffffff;--bg2:#ffffff;--bg3:#eef2fb;--bg4:#e2e8f4;
+  --txt:#0a1020;--txt2:#54648a;--neon:#2f6fed;--neon2:#5b8df3;
+  --purple:#6b3fd6;--blue:#2f6fed;--green:#10a35a;--gold:#b9790a;
+  --r:14px;--bg-opacity:0;--glow:0 10px 30px rgba(47,111,237,.14);
+  --glow-strong:0 16px 44px rgba(47,111,237,.22);
+  --grad1:#2f6fed;--grad2:#6b3fd6;--grad:linear-gradient(135deg,#2f6fed,#6b3fd6);
+  --logo-shadow:drop-shadow(0 6px 18px rgba(47,111,237,.28));
+  --tab-bg:#2f6fed;--tab-color:#fff;--tab-glow:0 8px 22px rgba(47,111,237,.32);
+  --nav-bg:rgba(47,111,237,.08);--nav-color:#2f6fed;
+  --border-glow:rgba(47,111,237,.18);--input-glow:rgba(47,111,237,.12);
+  --glass:#ffffff;--card-border:#e2e8f4;
+}
+/* Light mode: solid cards (no glass), soft shadow, crisp borders */
+[data-theme="light"] .panel,[data-theme="light"] .card,[data-theme="light"] .tbl,[data-theme="light"] .stat,
+[data-theme="light"] .modal-box,[data-theme="light"] .sidebar,[data-theme="light"] .topbar{
+  background:var(--glass);
+  backdrop-filter:none;
+  border:1px solid var(--card-border);
+  box-shadow:0 14px 40px rgba(18,24,40,.08);
+}
+[data-theme="light"] body{
+  background:#ffffff;
+  background-image:
+    radial-gradient(1100px 560px at 10% -10%, rgba(47,111,237,.10), transparent 60%),
+    radial-gradient(1000px 520px at 92% 2%, rgba(224,36,78,.08), transparent 60%),
+    radial-gradient(900px 600px at 50% 112%, rgba(107,63,214,.08), transparent 60%);
+  background-attachment:fixed;
+}
+/* Motion blur: brand logo drifts + soft blur for a modern, alive feel */
+[data-theme="light"] .sb-brand-t span,[data-theme="light"] .app-logo{
+  animation:motionBlur 7s ease-in-out infinite;
+  filter:blur(.25px);
+}
+@keyframes motionBlur{
+  0%,100%{transform:translateY(0);filter:blur(.25px)}
+  50%{transform:translateY(-3px);filter:blur(.9px)}
+}
+/* Active nav item: motion blur + glow */
+[data-theme="light"] .nav-item.active{
+  animation:navMotion 7s ease-in-out infinite;
+}
+@keyframes navMotion{
+  0%,100%{box-shadow:0 0 0 0 rgba(224,36,78,0)}
+  50%{box-shadow:0 0 18px rgba(224,36,78,.18);filter:blur(.3px)}
+}
 
 *{margin:0;padding:0;box-sizing:border-box}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
