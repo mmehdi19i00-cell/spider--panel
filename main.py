@@ -47,21 +47,11 @@ from services.xray_service import (
 
 # ── Import routers ─────────────────────────────────────────────────────────
 from routers.xhttp import router as xhttp_router
+from routers.pages import router as pages_router
 
 # ── Telegram First-Run Paths ───────────────────────────────────────────────
 TELEGRAM_FLAG_FILE = DATA_DIR / "telegram_seen.flag"
 TELEGRAM_LINK_FILE = Path(__file__).parent / "link.txt"
-
-# ── Frontend page assets (restored) ────────────────────────────────────────
-# The UI assets were kept but their route handlers were removed. We serve them
-# here WITHOUT changing any URLs. There is no templates/ dir and no Jinja2 in
-# the repo, so pages are returned as raw HTML responses (HTMLResponse /
-# FileResponse). This matches the original mechanism (services/pages.py exports
-# complete HTML documents, not Jinja2 templates).
-import services.pages as pages  # LOGIN_HTML, DASHBOARD_HTML
-import os as _os
-_STATIC_DIR = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "static")
-_FAVICON = _os.path.join(_STATIC_DIR, "spider-logo.png")
 
 # ── FastAPI App ────────────────────────────────────────────────────────────
 app = FastAPI(title="Spider Gateway", docs_url=None, redoc_url=None)
@@ -75,13 +65,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static files (restored mount)
-_STATIC_DIR_OBJ = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "static")
-if _os.path.exists(_STATIC_DIR_OBJ):
-    app.mount("/static", StaticFiles(directory=_STATIC_DIR_OBJ), name="static")
+# Static files
+import os as _os
+_STATIC_DIR = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "static")
+if _os.path.exists(_STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 # Include routers
 app.include_router(xhttp_router)
+app.include_router(pages_router)
 
 # ── HTTP Client ────────────────────────────────────────────────────────────
 http_client: httpx.AsyncClient | None = None
@@ -93,25 +85,25 @@ async def startup():
     limits = httpx.Limits(max_connections=500, max_keepalive_connections=100)
     timeout = httpx.Timeout(30.0, connect=10.0)
     http_client = httpx.AsyncClient(limits=limits, timeout=timeout, follow_redirects=True)
-
+    
     stats["start_time"] = asyncio.get_event_loop().time()
-
+    
     await load_state()
-
+    
     # CRITICAL: Validate Xray binary exists and works before starting service
     if not await is_xray_installed():
         error_msg = f"Xray Core binary not found at {XRAY_BINARY_PATH}. Build failed: Xray installation missing."
         logger.critical(error_msg)
         raise RuntimeError(error_msg)
-
+    
     version = await get_xray_version()
     if not version:
         error_msg = f"Xray binary at {XRAY_BINARY_PATH} is not executable or corrupted."
         logger.critical(error_msg)
         raise RuntimeError(error_msg)
-
+    
     logger.info(f"Xray Core validated: version {version} at {XRAY_BINARY_PATH}")
-
+    
     # Auto-create default inbound if none exist
     async with INBOUNDS_LOCK:
         if not INBOUNDS:
@@ -131,32 +123,9 @@ async def startup():
             }
             await save_state()
             log_activity("inbound", "اینباند پیش‌فرض VLESS+WS ساخته شد", "ok")
-
+    
     log_activity("system", "سرور راه‌اندازی شد", "ok")
     logger.info(f"Spider Gateway v9.2 started on port {CONFIG['port']}")
-
-    # Print all registered routes at startup (debug / verification aid)
-    _print_routes()
-
-
-def _print_routes():
-    """Log every mounted route path + methods at startup."""
-    logger.info("Registered routes:")
-    seen = set()
-    rows = []
-    for route in app.routes:
-        methods = getattr(route, "methods", None)
-        path = getattr(route, "path", None)
-        if path is None:
-            continue
-        key = (path, frozenset(methods) if methods else None)
-        if key in seen:
-            continue
-        seen.add(key)
-        m = ",".join(sorted(methods)) if methods else "*"
-        rows.append(f"  {m:18} {path}")
-    for r in sorted(rows):
-        logger.info(r)
 
 
 @app.on_event("shutdown")
@@ -208,34 +177,13 @@ async def require_auth(request: Request):
     return token
 
 # ── Basic endpoints ────────────────────────────────────────────────────────
-@app.get("/", response_class=HTMLResponse)
-async def index_page():
-    """Login page (entry point). LOGIN_HTML posts /api/login then redirects to /dashboard."""
-    return HTMLResponse(pages.LOGIN_HTML)
+@app.get("/")
+async def root():
+    return {"service": "Spider Gateway", "version": "9.2", "status": "active", "channel": "https://t.me/SpiderPanel"}
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "connections": len(connections), "uptime": uptime()}
-
-# ── Frontend page routes (restored) ────────────────────────────────────────
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard_page():
-    """Main admin dashboard SPA."""
-    return HTMLResponse(pages.DASHBOARD_HTML)
-
-@app.get("/spider", response_class=HTMLResponse)
-async def spider_page():
-    """Spider Panel v4 page (static/index.html)."""
-    idx = _os.path.join(_STATIC_DIR, "index.html")
-    if not _os.path.exists(idx):
-        raise HTTPException(status_code=404, detail="not found")
-    return FileResponse(idx, media_type="text/html")
-
-@app.get("/favicon.ico")
-async def favicon():
-    if _os.path.exists(_FAVICON):
-        return FileResponse(_FAVICON, media_type="image/png")
-    raise HTTPException(status_code=404, detail="not found")
 
 # ── Telegram First-Run API ────────────────────────────────────────────────
 @app.get("/api/telegram/status")
@@ -265,32 +213,6 @@ async def telegram_seen():
     except Exception as e:
         logger.error(f"Failed to create telegram_seen.flag: {e}")
         raise HTTPException(status_code=500, detail="Failed to save flag")
-
-# ── Frontend API routes (restored) ─────────────────────────────────────────
-@app.post("/api/login")
-async def api_login(request: Request):
-    """Validate admin password and issue a session cookie.
-
-    Called by LOGIN_HTML's JS. On success the client redirects to /dashboard.
-    """
-    try:
-        body = await request.json()
-        pw = body.get("password", "")
-    except Exception:
-        pw = ""
-    if hash_password(pw) != AUTH["password_hash"]:
-        raise HTTPException(status_code=401, detail="رمز عبور اشتباه است")
-    token = await create_session()
-    resp = JSONResponse({"success": True})
-    resp.set_cookie(SESSION_COOKIE, token, httponly=True,
-                    max_age=SESSION_TTL, samesite="lax")
-    return resp
-
-@app.post("/api/logout")
-async def api_logout(request: Request):
-    token = request.cookies.get(SESSION_COOKIE)
-    await destroy_session(token)
-    return {"success": True}
 
 # ── Include more routers as we create them ─────────────────────────────────
 # TODO: Add routers for users, inbounds, links, subs, etc.

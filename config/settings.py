@@ -1,15 +1,12 @@
-"""Configuration module - all settings, environment variables, constants.
-No FastAPI, no state - pure configuration."""
+"""
+Configuration module - all settings, environment variables, constants.
+No FastAPI, no state - pure configuration.
+"""
 import os
-import logging
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-# ── Logging (defined first so `logger` is always importable) ───────
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("Spider-Gateway")
-
-# ── Timezone ──────────────────────────────────────────────────────
+# ── Timezone ──────────────────────────────────────────────────────────────
 IRAN_TZ = ZoneInfo("Asia/Tehran")
 
 # ── Paths ──────────────────────────────────────────────────────────────────
@@ -89,6 +86,11 @@ def hash_password(pw: str) -> str:
 
 # Initial password hash
 AUTH = {"password_hash": hash_password(os.environ.get("ADMIN_PASSWORD", "admin"))}
+
+# ── Logging ────────────────────────────────────────────────────────────────
+import logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("Spider-Gateway")
 
 # ── Xray Core Constants (from original xray_core.py) ───────────────────────
 XRAY_VERSION = os.environ.get("XRAY_VERSION", "26.3.27")

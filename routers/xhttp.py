@@ -11,7 +11,6 @@ from core.state import (
     is_link_allowed, save_state,
     PATH_INDEX, PATH_INDEX_LOCK,
 )
-from services.xray_service import generate_vless_link  # noqa: F401  (kept for parity; xhttp routes don't use it yet)
 from services.relay_vless import parse_vless_header, check_and_use
 
 # ── Router ────────────────────────────────────────────────────────────────
