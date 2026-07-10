@@ -192,6 +192,12 @@ async def install_xray_core(force: bool = False, version: str = XRAY_VERSION) ->
             return True
 
 # ── Reality Key Generation ─────────────────────────────────────────────────
+def _is_x25519_hex(s: str) -> bool:
+    """True if s is exactly a 64-char hex x25519 key."""
+    s = s.strip()
+    return len(s) == 64 and all(c in "0123456789abcdefABCDEF" for c in s)
+
+
 async def generate_reality_keypair() -> Tuple[str, str]:
     """Generate a Reality x25519 key pair using the installed Xray binary.
 
@@ -208,20 +214,35 @@ async def generate_reality_keypair() -> Tuple[str, str]:
     output = result["stdout"]
     private_key = ""
     public_key = ""
-    for line in output.splitlines():
-        line = line.strip()
+    pending_label = None  # label seen on a previous line (two-line Xray format)
+    for raw in output.splitlines():
+        line = raw.strip()
         low = line.lower()
-        # Xray prints "PrivateKey:" / "PublicKey:" but casing/spacing varies by
-        # version (e.g. "Private key:"). Match case-insensitively on the key name.
+        # Label-only line, e.g. "Private key:" with the value on the next line.
+        if low in ("privatekey:", "private key:"):
+            pending_label = "private"
+            continue
+        if low in ("publickey:", "public key:"):
+            pending_label = "public"
+            continue
+        # Bare value line following a label (two-line Xray format).
+        if pending_label and _is_x25519_hex(line):
+            if pending_label == "private":
+                private_key = line
+            else:
+                public_key = line
+            pending_label = None
+            continue
+        # "Label: value" on one line.
         if low.startswith("privatekey:") or low.startswith("private key:"):
             private_key = line.split(":", 1)[1].strip()
         elif low.startswith("publickey:") or low.startswith("public key:"):
             public_key = line.split(":", 1)[1].strip()
 
     if not private_key or not public_key:
-        # Last resort: regex for 64-hex x25519 keys anywhere in output.
+        # Backstop: any two 64-char hex strings in the output.
         import re
-        hex64 = re.findall(r"\b[0-9a-fA-F]{64}\b", output)
+        hex64 = re.findall(r"[0-9a-fA-F]{64}", output)
         if len(hex64) >= 2:
             private_key, public_key = hex64[0], hex64[1]
     if not private_key or not public_key:

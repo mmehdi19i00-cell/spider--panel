@@ -1234,7 +1234,7 @@ async function generateRealityKeysUI() {
     $id('ib-privkey').value = r.private_key || '';
     $id('ib-pubkey').value = r.public_key || '';
     toast('کلیدهای Reality تولید شد', 'ok');
-  } catch(e) { toast('خطا در تولید کلید', 'err'); }
+  } catch(e) { toast('خطا در تولید کلید: ' + (e.message || ''), 'err'); }
 }
 
 async function generateShortId() {
