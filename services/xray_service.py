@@ -451,7 +451,9 @@ def generate_vless_link(
     if network == "ws":
         ws = inbound.get("ws_settings", {})
         params["host"] = inbound.get("external_domain") or ws.get("host") or host
-        params["path"] = ws.get("path", f"/{uuid}")  # path from config, not "/ws/uuid" hardcoded
+        # ws path must EXACTLY match the server-side wsSettings.path.
+        # Default to /ws/{inbound id} (a 32-hex uuid) so client & server agree.
+        params["path"] = ws.get("path") or f"/ws/{inbound_id or uuid}"
         params["alpn"] = "http/1.1"
     elif network == "xhttp":
         xh = inbound.get("xhttp_settings", {})
@@ -612,7 +614,7 @@ def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
         inbound_obj["streamSettings"] = stream
         if network == "ws":
             inbound_obj["streamSettings"]["wsSettings"] = {
-                "path": ws_settings.get("path", "/"),
+                "path": ws_settings.get("path") or f"/ws/{iid}",
                 "headers": {"Host": ws_settings.get("host", domain)}
             }
         elif network == "grpc":
@@ -629,7 +631,7 @@ def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
     else:
         inbound_obj["streamSettings"] = {"network": network}
         if network == "ws":
-            inbound_obj["streamSettings"]["wsSettings"] = {"path": ws_settings.get("path", "/")}
+            inbound_obj["streamSettings"]["wsSettings"] = {"path": ws_settings.get("path") or f"/ws/{iid}"}
     
     inbound_obj["sniffing"] = {
         "enabled": True,
