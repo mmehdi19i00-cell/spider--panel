@@ -377,17 +377,26 @@ def _server_resources() -> dict:
     vm = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
     net = psutil.net_io_counters()
+    boot = _BOOT_TIME
     return {
+        "status": "LIVE",
         "cpu_percent": psutil.cpu_percent(interval=0.2),
         "cpu_count": psutil.cpu_count() or 1,
+        # UI-expected raw fields (bytes/MB)
+        "ram_used": vm.used,
+        "ram_total": vm.total,
+        "ram_percent": vm.percent,
         "ram_used_gb": vm.used / 1073741824,
         "ram_total_gb": vm.total / 1073741824,
-        "ram_percent": vm.percent,
+        "disk_used": disk.used,
+        "disk_total": disk.total,
         "disk_percent": disk.percent,
         "disk_total_gb": disk.total / 1073741824,
+        "upload": (net.bytes_sent if net else 0),
+        "download": (net.bytes_recv if net else 0),
         "net_sent_mb": (net.bytes_sent if net else 0) / 1048576,
         "net_recv_mb": (net.bytes_recv if net else 0) / 1048576,
-        "uptime_seconds": int(time.time() - _BOOT_TIME),
+        "uptime_seconds": int(time.time() - boot),
     }
 
 
@@ -395,6 +404,33 @@ def _server_resources() -> dict:
 async def server_resources():
     try:
         return _server_resources()
+    except Exception as e:  # noqa
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/server/status")
+async def server_status():
+    """Live server status for the dashboard (matches the UI's expected shape)."""
+    try:
+        r = _server_resources()
+        total_traffic = sum(u.get("traffic_used_bytes", 0) for u in USERS.values())
+        return {
+            "status": "LIVE",
+            "cpu": r["cpu_percent"],
+            "cpu_count": r["cpu_count"],
+            "ram_used": r["ram_used"],
+            "ram_total": r["ram_total"],
+            "ram_percent": r["ram_percent"],
+            "disk_used": r["disk_used"],
+            "disk_total": r["disk_total"],
+            "disk_percent": r["disk_percent"],
+            "upload": r["upload"],
+            "download": r["download"],
+            "uptime": r["uptime_seconds"],
+            "traffic_total_bytes": total_traffic,
+            "users_count": len(USERS),
+            "inbounds_count": len(INBOUNDS),
+        }
     except Exception as e:  # noqa
         raise HTTPException(status_code=500, detail=str(e))
 

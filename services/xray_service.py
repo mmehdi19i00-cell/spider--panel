@@ -461,8 +461,9 @@ def generate_vless_link(
         ws = inbound.get("ws_settings", {})
         params["host"] = inbound.get("external_domain") or ws.get("host") or host
         # ws path must EXACTLY match the server-side wsSettings.path.
-        # Default to /ws/{inbound id} (a 32-hex uuid) so client & server agree.
-        params["path"] = ws.get("path") or f"/ws/{inbound_id or uuid}"
+        # Per-user dedicated path: /ws/{user config_uuid} (standard UUID).
+        # If an explicit path is configured on the inbound it is honored.
+        params["path"] = ws.get("path") or f"/ws/{uuid}"
         params["alpn"] = "http/1.1"
     elif network == "xhttp":
         xh = inbound.get("xhttp_settings", {})
@@ -517,6 +518,22 @@ def generate_xray_server_config(inbound_id: Optional[str] = None) -> Dict[str, A
             _add_inbound_to_xray(config, ib, iid, host)
     
     return config
+
+def _ws_path_for_inbound(iid: str, ws_settings: dict) -> str:
+    """ws path that EXACTLY matches the client link.
+
+    Per-user dedicated path: /ws/{config_uuid} of the first user linked to
+    this inbound. Falls back to /ws/{inbound id} when no user is linked yet.
+    """
+    if ws_settings.get("path"):
+        return ws_settings["path"]
+    cuuid = None
+    for u in USERS.values():
+        if u.get("inbound_id") == iid and u.get("config_uuid"):
+            cuuid = u["config_uuid"]
+            break
+    return f"/ws/{cuuid}" if cuuid else f"/ws/{iid}"
+
 
 def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
     protocol = ib.get("protocol", "vless")
@@ -625,7 +642,7 @@ def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
         inbound_obj["streamSettings"] = stream
         if network == "ws":
             inbound_obj["streamSettings"]["wsSettings"] = {
-                "path": ws_settings.get("path") or f"/ws/{iid}",
+                "path": _ws_path_for_inbound(iid, ws_settings),
                 "headers": {"Host": ws_settings.get("host", domain)}
             }
         elif network == "grpc":
@@ -646,7 +663,7 @@ def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
     else:
         inbound_obj["streamSettings"] = {"network": network}
         if network == "ws":
-            inbound_obj["streamSettings"]["wsSettings"] = {"path": ws_settings.get("path") or f"/ws/{iid}"}
+            inbound_obj["streamSettings"]["wsSettings"] = {"path": _ws_path_for_inbound(iid, ws_settings)}
     
     inbound_obj["sniffing"] = {
         "enabled": True,

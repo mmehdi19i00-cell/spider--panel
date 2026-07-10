@@ -136,7 +136,9 @@ async def startup():
     # Auto-create default inbound if none exist
     async with INBOUNDS_LOCK:
         if not INBOUNDS:
-            INBOUNDS["default"] = {
+            from core.state import generate_uuid
+            default_iid = generate_uuid()
+            INBOUNDS[default_iid] = {
                 "name": "VLESS+WS پیش‌فرض",
                 "protocol": "vless",
                 "port": 443,
