@@ -169,8 +169,25 @@ function render(d){
   h+='<div class="sbar" style="margin-top:14px">';
   h+='<div class="sbar-item"><div class="sbar-dot '+(isOk?'on':'off')+'"></div>'+(isOk?'Active':'Expired')+'</div>';
   h+='<div class="sbar-item">'+proto+'</div>';
-  h+='<div class="sbar-item">'+ (d.concurrent_connections||2)+' Conn</div>';
+  h+='<div class="sbar-item">Allowed IPs: '+(d.allowed_ips!=null?d.allowed_ips:2)+'</div>';
+  h+='<div class="sbar-item">Connected: '+(d.connected_ips||0)+' / '+(d.allowed_ips!=null?d.allowed_ips:2)+'</div>';
+  h+='<div class="sbar-item">Online: '+(d.online_sessions||0)+'</div>';
   h+='</div></div>';
+
+  // Protocols / per-config live status (بخش دوم)
+  if (d.configs_live && d.configs_live.length){
+    h+='<div class="body" style="margin-top:12px"><div class="cfg-l">پروتکل‌ها و وضعیت آنلاین</div>';
+    d.configs_live.forEach(function(c){
+      var on = c.online;
+      h+='<div class="sbar" style="margin-top:8px">';
+      h+='<div class="sbar-item">'+esc(c.label||c.network||'')+'</div>';
+      h+='<div class="sbar-item">'+esc((c.protocol||'vless').toUpperCase())+'</div>';
+      h+='<div class="sbar-item"><div class="sbar-dot '+(on?'on':'off')+'"></div>'+(on?'Online':'Offline')+'</div>';
+      h+='<div class="sbar-item">'+(c.active_connections||0)+' Active Connections</div>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
 
   h+='<div class="body">';
 

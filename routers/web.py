@@ -25,6 +25,7 @@ from core.state import (
     SESSIONS, SESSIONS_LOCK,
     find_user_by_uuid, find_user_by_username,
     is_link_allowed,
+    count_connected_ips, active_sessions,
 )
 from services.xray_service import (
     generate_vless_link as svc_generate_vless_link,
@@ -214,16 +215,43 @@ async def user_subscription(key: str, request: Request):
         except Exception:
             expire_days = None
 
+    cuuid = user.get("config_uuid") or uid
+    connected_ips = count_connected_ips(cuuid)
+    online_sessions = len(active_sessions(cuuid))
+    # Per-config live status (read from session tracking for ws/tls; reality
+    # reports via its own inbound). "online" = at least one active session.
+    configs_live = []
+    for c in configs:
+        ciid = c.get("inbound_id")
+        inbound = INBOUNDS.get(ciid, {})
+        sec = inbound.get("security", "tls")
+        net = inbound.get("network", "ws")
+        label = ("Reality" if sec == "reality" else "WS TLS") if net in ("ws", "xhttp") else net.upper()
+        cfg_sessions = [s for s in active_sessions(cuuid) if s.get("inbound_id") == ciid]
+        configs_live.append({
+            "inbound_id": ciid,
+            "protocol": inbound.get("protocol", "vless"),
+            "network": net,
+            "security": sec,
+            "label": label,
+            "online": len(cfg_sessions) > 0,
+            "active_connections": len(cfg_sessions),
+        })
+
     return JSONResponse({
         "success": True,
         "config": first_link,            # sub.html reads d.config
         "vless_link": first_link,
         "configs": configs,
+        "configs_live": configs_live,
         "username": user.get("username", key),
         "uuid": user.get("uuid", key),
         "protocol": (user.get("inbound_id") and INBOUNDS.get(user["inbound_id"], {}).get("protocol")) or "vless",
         "status": user.get("status", "active"),
         "concurrent_connections": user.get("concurrent_connections", 2),
+        "allowed_ips": user.get("concurrent_connections", 2),
+        "connected_ips": connected_ips,
+        "online_sessions": online_sessions,
         "traffic_used_bytes": used,
         "traffic_limit_bytes": limit,
         "expire_days": expire_days,

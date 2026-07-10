@@ -27,7 +27,7 @@ from config import (
     XRAY_BINARY_PATH, XRAY_CONFIG_PATH, XRAY_ASSETS_DIR, XRAY_LOG_DIR,
     hash_password,
 )
-from core.state import generate_uuid, INBOUNDS, INBOUNDS_LOCK, save_state, USERS
+from core.state import generate_uuid, INBOUNDS, INBOUNDS_LOCK, save_state, USERS, get_active_domain
 import aiofiles
 
 logger = logging.getLogger("xray_service")
@@ -409,6 +409,7 @@ def generate_vless_link(
     so callers return a clean JSON error rather than a broken link.
     """
     import json
+    import re as _re
     from urllib.parse import quote
 
     # ── Resolve inbound (the single source of truth) ──────────────────────
@@ -418,12 +419,35 @@ def generate_vless_link(
         inbound = next(iter(INBOUNDS.values())) if INBOUNDS else None
     if not inbound:
         raise RuntimeError("No Xray inbound configured; cannot generate VLESS link")
+    security = inbound.get("security", "tls")
+    network = inbound.get("network", "ws")
+
+    # ── Validation (بخش هشتم): refuse to build a broken config ────────────
+    # UUID must be a valid (dashed) VLESS uuid.
+    if not _re.fullmatch(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+                         r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", str(uuid or "")):
+        raise ValueError(f"Invalid VLESS uuid: {uuid!r}")
+    # Inbound must have an id.
+    if not inbound.get("id") and not inbound_id:
+        raise RuntimeError("Inbound has no id; cannot generate VLESS link")
+    # IP-limit must be a non-negative integer.
+    ip_limit = int(user.get("concurrent_connections", 2) if user else 2)
+    if ip_limit < 0:
+        raise ValueError(f"Invalid IP limit: {ip_limit}")
+    # WS/TLS requires an active domain (Domain Manager) to point the link at.
+    if security != "reality" and network in ("ws", "xhttp"):
+        if not get_active_domain():
+            raise RuntimeError("No active domain configured; cannot generate WS/TLS link")
 
     # ── Public endpoint (NEVER internal listen port) ──────────────────────
-    host = inbound.get("external_domain") or inbound.get("domain") or SETTINGS.get("domain") or get_host()
+    # For WS/TLS the address/host/sni MUST come from the ACTIVE domain manager
+    # domain (so changing the active domain re-points all ws configs on the
+    # next generate). Reality keeps its own external_domain/serverNames.
+    if security == "reality":
+        host = inbound.get("external_domain") or inbound.get("domain") or SETTINGS.get("domain") or get_host()
+    else:
+        host = get_active_domain() or inbound.get("external_domain") or inbound.get("domain") or SETTINGS.get("domain") or get_host()
     port = inbound.get("external_port", 443)
-    network = inbound.get("network", "ws")
-    security = inbound.get("security", "tls")
 
     # ── Validation: external endpoint must exist ──────────────────────────
     if not host:
@@ -452,14 +476,19 @@ def generate_vless_link(
         # fingerprint for Reality comes from reality_settings when present
         params["fp"] = rk["fp"]
     else:
-        # Non-reality: sni only meaningful for real tls with a known cert domain
-        sni = inbound.get("sni") or host
+        # Non-reality: for WS/TLS the active Domain-Manager domain is the SNI
+        # (so changing the active domain re-points every ws config). Reality
+        # uses its own external_domain/serverNames and never reaches here.
+        sni = host if (network in ("ws", "xhttp")) else (inbound.get("sni") or host)
         params["sni"] = sni
 
     # ── Transport-specific params, strictly from inbound ───────────────────
     if network == "ws":
         ws = inbound.get("ws_settings", {})
-        params["host"] = inbound.get("external_domain") or ws.get("host") or host
+        # For WS/TLS the Host header must equal the active Domain-Manager
+        # domain (same as address/sni). Falls back to the inbound's own
+        # external_domain only if no active domain is configured.
+        params["host"] = host if (host == get_active_domain() or not inbound.get("external_domain")) else (inbound.get("external_domain") or host)
         # ws path must EXACTLY match the server-side wsSettings.path.
         # Per-user dedicated path: /ws/{user config_uuid} (standard UUID).
         # If an explicit path is configured on the inbound it is honored.
@@ -626,9 +655,16 @@ def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
                 "scMaxEachPostBytes": merged_xh.get("scMaxEachPostBytes", "1000000"),
             }
     elif security == "tls":
+        # Behind a TLS-terminating reverse proxy (Railway / Cloudflare / Nginx),
+        # the proxy already does TLS and forwards a *plain* WebSocket to this
+        # process. Xray must therefore listen with security:"none" on its
+        # internal port — otherwise it expects a TLS handshake it never
+        # receives (the client sees wss at the edge, plain ws internally).
+        # The generated VLESS link still advertises security=tls (client->edge).
+        xray_security = "none" if network in ("ws", "xhttp", "grpc") else "tls"
         stream = {
             "network": network,
-            "security": "tls",
+            "security": xray_security,
         }
         # Only reference certificate files if they actually exist. Xray auto-
         # generates a self-signed cert at runtime when tlsSettings is omitted,
@@ -637,7 +673,7 @@ def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
         tls_settings = ib.get("tls_settings") or {}
         cert_file = tls_settings.get("certificateFile")
         key_file = tls_settings.get("keyFile")
-        if cert_file and key_file and Path(cert_file).exists() and Path(key_file).exists():
+        if xray_security == "tls" and cert_file and key_file and Path(cert_file).exists() and Path(key_file).exists():
             stream["tlsSettings"] = {"certificates": [{"certificateFile": cert_file, "keyFile": key_file}]}
         inbound_obj["streamSettings"] = stream
         if network == "ws":
@@ -736,7 +772,12 @@ async def start_xray(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         if not await write_xray_config(config):
             return {"ok": False, "error": "Failed to write config"}
         
-        XRAY_LOG_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            XRAY_LOG_DIR.mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError) as e:
+            # Log dir may be read-only in some environments (e.g. sandbox).
+            # Xray can still run; we just won't capture its logs to disk.
+            logger.warning(f"Cannot create Xray log dir {XRAY_LOG_DIR}: {e}")
         log_file = XRAY_LOG_DIR / "xray.log"
         
         try:

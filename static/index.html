@@ -466,11 +466,17 @@ tr{animation:fadeIn .3s ease}
 
         <!-- Domain Management -->
         <div class="panel">
-          <div class="panel-h"><span class="glow">مدیریت دامنه</span></div>
-          <form onsubmit="saveDomainSettings(event)">
-            <div class="f-g"><label>دامنه</label><input type="text" id="set-domain" placeholder="example.com" dir="ltr"></div>
-            <button class="btn btn-p" style="width:100%;margin-top:8px">ذخیره دامنه</button>
-          </form>
+          <div class="panel-h"><span class="glow">مدیریت دامنه (Domain Manager)</span></div>
+          <div class="f-g"><label>دامنه فعال (Active Domain)</label>
+            <select id="set-active-domain" dir="ltr" onchange="activateDomain(this.value)"></select>
+          </div>
+          <div class="f-g" style="margin-top:10px"><label>افزودن دامنه جدید</label>
+            <div style="display:flex;gap:8px">
+              <input type="text" id="set-new-domain" placeholder="new.example.com" dir="ltr" style="flex:1">
+              <button class="btn btn-p" onclick="addDomain()">افزودن</button>
+            </div>
+          </div>
+          <div id="domains-list" style="margin-top:12px"></div>
         </div>
       </div>
 
@@ -940,6 +946,7 @@ async function loadAll() {
   loadDashboard();
   loadUsers();
   loadInbounds();
+  loadDomains();
 }
 
 // ─── Dashboard ───
@@ -997,6 +1004,26 @@ async function refreshLiveStats() {
     if ($id('live-net-recv')) $id('live-net-recv').textContent = fmtBytes(st.download) + '/s';
     if ($id('live-uptime')) $id('live-uptime').textContent = fmtUptime(st.uptime);
     if ($id('live-status')) $id('live-status').textContent = '● ' + (st.status||'LIVE');
+    refreshConnectionStats();
+  } catch(e) { /* keep old values */ }
+}
+
+// Live IP-limit / connection counts per user (بخش اول/دوم) — no full reload,
+// just updates the badge cells so the dashboard stays real-time.
+async function refreshConnectionStats() {
+  try {
+    var d = await api('/api/ip-limit');
+    var map = {};
+    (d.users || []).forEach(function(x){ map[x.user_id] = x; });
+    var rows = document.querySelectorAll('#users-list tbody tr');
+    // Re-render is simplest & keeps data fresh; only if data changed.
+    if (Object.keys(map).length) {
+      ALL_USERS.forEach(function(u){
+        var c = map[u.user_id];
+        if (c) { u.connected_ips = c.connected_ips; u.online_sessions = c.online_sessions; }
+      });
+      renderUsers();
+    }
   } catch(e) { /* keep old values */ }
 }
 function setRing(id, pct) {
@@ -1036,7 +1063,7 @@ async function loadUsers() {
 function renderUsers() {
   var el = $id('users-list');
   if (!ALL_USERS.length) { el.innerHTML = '<div class="empty">هیچ کاربری وجود ندارد</div>'; return; }
-  var html = '<div class="tbl"><table><thead><tr><th>نام کاربری</th><th>حجم</th><th>انقضا</th><th>اتصال</th><th>وضعیت</th><th>اینباند</th><th>عملیات</th></tr></thead><tbody>';
+  var html = '<div class="tbl"><table><thead><tr><th>نام کاربری</th><th>حجم</th><th>انقضا</th><th>IP Limit</th><th>متصل / آنلاین</th><th>وضعیت</th><th>اینباند</th><th>عملیات</th></tr></thead><tbody>';
   for (var i = 0; i < ALL_USERS.length; i++) {
     var u = ALL_USERS[i];
     var used = u.traffic_used_bytes || 0, limit = u.traffic_limit_bytes || 0;
@@ -1045,11 +1072,15 @@ function renderUsers() {
     var expText = exp === null ? 'نامحدود' : exp <= 0 ? '<span style="color:var(--red)">منقضی</span>' : exp + ' روز';
     var statusBadge = u.status === 'active' ? '<span class="badge badge-g">فعال</span>' : '<span class="badge badge-r">غیرفعال</span>';
     var inboundName = u.inbound_name || (u.inbound_id ? u.inbound_id.substring(0,8) : 'پیش‌فرض');
+    var conn = u.concurrent_connections || 2;
+    var connected = u.connected_ips != null ? u.connected_ips : '–';
+    var online = u.online_sessions != null ? u.online_sessions : '–';
     html += '<tr>';
     html += '<td><strong>' + esc(u.username) + '</strong></td>';
     html += '<td>' + fmtBytes(used) + ' / ' + (limit ? fmtBytes(limit) : 'نامحدود') + '<div class="pbar"><div class="pbar-f" style="width:' + pct + '%"></div></div></td>';
     html += '<td>' + expText + '</td>';
-    html += '<td>' + (u.concurrent_connections || '۲') + '</td>';
+    html += '<td>' + conn + '</td>';
+    html += '<td><span class="badge badge-b">' + connected + ' / ' + online + '</span></td>';
     html += '<td>' + statusBadge + '</td>';
     html += '<td><span class="badge badge-b">' + esc(inboundName) + '</span></td>';
     html += '<td><div class="act-row">';
@@ -1576,14 +1607,68 @@ async function changePassword(e) {
   } catch(e) { toast(e.message, 'err'); }
 }
 
-async function saveDomainSettings(e) {
-  e.preventDefault();
+// ─── Domain Manager (بخش سوم/چهارم) ───
+async function loadDomains() {
   try {
-    await api('/api/tools/settings', {method: 'POST', body: {
-      domain: $id('set-domain').value
-    }});
-    toast('تنظیمات دامنه ذخیره شد', 'ok');
-  } catch(e) { toast(e.message, 'err'); }
+    var d = await api('/api/domains');
+    var sel = $id('set-active-domain');
+    if (sel) {
+      sel.innerHTML = (d.domains || []).map(function(x){
+        return '<option value="' + x.id + '"' + (x.is_active ? ' selected' : '') + '>' + esc(x.domain) + (x.is_active ? ' ✅' : '') + '</option>';
+      }).join('');
+    }
+    var list = $id('domains-list');
+    if (list) {
+      list.innerHTML = (d.domains || []).map(function(x){
+        var active = x.is_active;
+        return '<div class="dom-row" style="display:flex;align-items:center;gap:8px;padding:8px;margin-bottom:6px;border:1px solid var(--border);border-radius:10px;background:var(--bg2)">' +
+          '<span style="flex:1;font-family:monospace;font-size:13px">' + esc(x.domain) + (active ? ' <span style="color:var(--neon)">[ACTIVE]</span>' : '') + '</span>' +
+          (active ? '' : '<button class="btn btn-sm btn-g" onclick="activateDomain(\'' + x.id + '\')">فعال‌سازی</button>') +
+          '<button class="btn btn-sm btn-b" onclick="renameDomain(\'' + x.id + '\')">تغییر نام</button>' +
+          (active ? '' : '<button class="btn btn-sm btn-r" onclick="deleteDomain(\'' + x.id + '\')">حذف</button>') +
+        '</div>';
+      }).join('') || '<div class="empty">دامنه‌ای ثبت نشده</div>';
+    }
+  } catch(e) { /* ignore */ }
+}
+
+async function addDomain() {
+  var v = ($id('set-new-domain').value || '').trim();
+  if (!v) { toast('نام دامنه خالی است', 'err'); return; }
+  try {
+    await api('/api/domains', {method:'POST', body:{domain:v}});
+    $id('set-new-domain').value = '';
+    toast('دامنه افزوده شد', 'ok');
+    loadDomains();
+  } catch(e) { toast(e.message || 'خطا', 'err'); }
+}
+
+async function activateDomain(id) {
+  if (!id) return;
+  try {
+    await api('/api/domains/' + id + '/activate', {method:'POST'});
+    toast('دامنه فعال شد — کانفیگ‌های WS/TLS جدید از این دامنه استفاده می‌کنند', 'ok');
+    loadDomains();
+  } catch(e) { toast(e.message || 'خطا', 'err'); }
+}
+
+async function renameDomain(id) {
+  var v = prompt('نام جدید دامنه:');
+  if (!v) return;
+  try {
+    await api('/api/domains/' + id, {method:'PUT', body:{domain:v.trim()}});
+    toast('نام دامنه تغییر کرد', 'ok');
+    loadDomains();
+  } catch(e) { toast(e.message || 'خطا', 'err'); }
+}
+
+async function deleteDomain(id) {
+  if (!confirm('حذف این دامنه؟ (فقط دامنه غیرفعال قابل حذف است)')) return;
+  try {
+    await api('/api/domains/' + id, {method:'DELETE'});
+    toast('دامنه حذف شد', 'ok');
+    loadDomains();
+  } catch(e) { toast(e.message || 'خطا', 'err'); }
 }
 
 // ─── Modal ───

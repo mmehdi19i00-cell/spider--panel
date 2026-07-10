@@ -31,6 +31,9 @@ from core.state import (
     LINKS, LINKS_LOCK,
     save_state, generate_uuid, SETTINGS,
     stats, connections, hourly_traffic, error_logs, activity_logs,
+    DOMAINS, get_active_domain, set_active_domain, add_domain,
+    count_connected_ips, active_sessions,
+    find_user_by_uuid, find_user_by_config_uuid,
 )
 from services.xray_service import (
     generate_vless_link,
@@ -105,6 +108,8 @@ def _user_out(uid: str, u: dict) -> dict:
         "inbound_id": inbound_id,
         "inbound_name": inbound.get("name") if inbound else (inbound_id or "پیش‌فرض"),
         "concurrent_connections": u.get("concurrent_connections", 2),
+        "connected_ips": count_connected_ips(u.get("config_uuid") or uid),
+        "online_sessions": len(active_sessions(u.get("config_uuid") or uid)),
     }
 
 
@@ -456,6 +461,121 @@ async def server_stats():
 async def stats_legacy():
     """Legacy dashboard endpoint used by some frontends."""
     return await server_stats()
+
+
+# ── Domain Manager ────────────────────────────────────────────────────────
+class DomainCreateReq(BaseModel):
+    domain: str
+    description: str = ""
+
+
+class DomainUpdateReq(BaseModel):
+    domain: Optional[str] = None
+    description: Optional[str] = None
+
+
+@router.get("/api/domains")
+async def list_domains():
+    """List all domains with their active flag; includes the active domain."""
+    domains = [
+        {
+            "id": did,
+            "domain": d["domain"],
+            "description": d.get("description", ""),
+            "is_active": bool(d.get("is_active")),
+            "created_at": d.get("created_at"),
+            "updated_at": d.get("updated_at"),
+        }
+        for did, d in DOMAINS.items()
+    ]
+    return {"domains": domains, "active_domain": get_active_domain()}
+
+
+@router.post("/api/domains")
+async def create_domain(body: DomainCreateReq):
+    if not body.domain:
+        raise HTTPException(status_code=400, detail="نام دامنه الزامی است")
+    did = add_domain(body.domain, body.description)
+    await save_state()
+    return {"success": True, "id": did, "domain": body.domain, "active_domain": get_active_domain()}
+
+
+@router.put("/api/domains/{domain_id}")
+async def update_domain(domain_id: str, body: DomainUpdateReq):
+    d = DOMAINS.get(domain_id)
+    if not d:
+        raise HTTPException(status_code=404, detail="دامنه یافت نشد")
+    if body.domain is not None:
+        d["domain"] = body.domain
+    if body.description is not None:
+        d["description"] = body.description
+    d["updated_at"] = datetime.now().isoformat()
+    await save_state()
+    return {"success": True, "id": domain_id, "domain": d["domain"]}
+
+
+@router.delete("/api/domains/{domain_id}")
+async def delete_domain(domain_id: str):
+    d = DOMAINS.get(domain_id)
+    if not d:
+        raise HTTPException(status_code=404, detail="دامنه یافت نشد")
+    if d.get("is_active"):
+        raise HTTPException(status_code=400, detail="دامنه فعال قابل حذف نیست؛ ابتدا دامنه دیگری را فعال کنید")
+    del DOMAINS[domain_id]
+    await save_state()
+    return {"success": True}
+
+
+@router.post("/api/domains/{domain_id}/activate")
+async def activate_domain(domain_id: str):
+    if not set_active_domain(domain_id):
+        raise HTTPException(status_code=404, detail="دامنه یافت نشد")
+    await save_state()
+    return {"success": True, "active_domain": get_active_domain()}
+
+
+@router.get("/api/ip-limit")
+async def ip_limit_info():
+    """Global IP-limit overview: per-user allowed vs connected IPs."""
+    out = []
+    for uid, u in USERS.items():
+        cuuid = u.get("config_uuid") or uid
+        out.append({
+            "user_id": uid,
+            "username": u.get("username", ""),
+            "limit": u.get("concurrent_connections", 2),
+            "connected_ips": count_connected_ips(cuuid),
+            "online_sessions": len(active_sessions(cuuid)),
+        })
+    return {"users": out}
+
+
+@router.get("/api/user/{uuid}/connections")
+async def user_connections(uuid: str):
+    uid, user = find_user_by_uuid(uuid)
+    if uid is None:
+        uid, user = find_user_by_config_uuid(uuid)
+    if uid is None or user is None:
+        raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+    cuuid = user.get("config_uuid") or uid
+    return {
+        "user_id": uid,
+        "allowed_ips": user.get("concurrent_connections", 2),
+        "connected_ips": count_connected_ips(cuuid),
+        "online_sessions": len(active_sessions(cuuid)),
+        "sessions": active_sessions(cuuid),
+    }
+
+
+@router.get("/api/user/{uuid}/sessions")
+async def user_sessions(uuid: str):
+    uid, user = find_user_by_uuid(uuid)
+    if uid is None:
+        uid, user = find_user_by_config_uuid(uuid)
+    if uid is None or user is None:
+        raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+    cuuid = user.get("config_uuid") or uid
+    return {"user_id": uid, "sessions": active_sessions(cuuid)}
 
 
 # ── Change password ─────────────────────────────────────────────────────────

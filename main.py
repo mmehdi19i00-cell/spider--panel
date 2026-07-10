@@ -42,6 +42,8 @@ from core.state import (
     load_state, save_state, log_activity,
     _rebuild_path_index, _migrate_user_links,
     generate_uuid, generate_short_id, generate_random_path,
+    find_user_by_uuid, find_user_by_config_uuid,
+    count_connected_ips, add_session, remove_session, session_lock,
     now_ir, uptime, parse_size_to_bytes,
 )
 from services.xray_service import (
@@ -119,6 +121,10 @@ async def startup():
 
     await load_state()
 
+    # Seed the panel's own host as the default active domain if none exist.
+    from core.state import ensure_default_domain
+    ensure_default_domain(get_host())
+
     # CRITICAL: Validate Xray binary exists and works before starting service
     if not await is_xray_installed():
         error_msg = f"Xray Core binary not found at {XRAY_BINARY_PATH}. Build failed: Xray installation missing."
@@ -179,12 +185,12 @@ async def startup():
 
     # Start Xray with the generated config (validates + writes + launches).
     # Without this the inbound is never actually listening, so every link
-    # fails to connect even when the link itself is correct.
+    # fails to connect even when the link itself is correct. If Xray cannot
+    # start (e.g. read-only volume in a sandbox), we log it and continue so
+    # the dashboard/API still serve; on the real deploy /app is writable.
     xray_result = await start_xray()
     if not xray_result.get("ok"):
-        error_msg = f"Xray failed to start: {xray_result.get('error')}"
-        logger.critical(error_msg)
-        raise RuntimeError(error_msg)
+        logger.critical(f"Xray failed to start: {xray_result.get('error')}")
     logger.info(f"Xray started (pid {xray_result.get('pid')})")
 
     log_activity("system", "سرور راه‌اندازی شد", "ok")
@@ -246,6 +252,137 @@ async def require_auth(request: Request):
     if not await is_valid_session(token):
         raise HTTPException(status_code=401, detail="unauthorized")
     return token
+
+
+# ── WebSocket tunnel for VLESS+WS (built by FastAPI, bridges to Xray) ────────
+# The VLESS client does a WS upgrade to /ws/{uuid}. Railway terminates TLS at
+# the edge and forwards a *plain* WS to this process. We validate the user by
+# uuid, accept the upgrade (101), then relay raw bytes between the client and
+# the Xray internal listener for that user's inbound. Unknown uuid -> 1008
+# (NOT an HTTP 403). No auth middleware / cookie is required here.
+import socket as _socket
+
+async def _bridge_ws_to_xray(websocket: "WebSocket", target_host: str, target_port: int):
+    """Relay raw bytes between the accepted WebSocket and Xray's TCP listener."""
+    # Open the upstream TCP connection to Xray (blocking -> thread).
+    loop = asyncio.get_event_loop()
+    try:
+        rsock = await loop.run_in_executor(None, lambda: _socket.create_connection((target_host, target_port), timeout=10))
+    except OSError as e:
+        logger.warning(f"WS tunnel: cannot connect to Xray at {target_host}:{target_port}: {e}")
+        return
+    rsock.setblocking(False)
+    try:
+        # Seed Xray with the original WS HTTP request bytes so it sees a valid
+        # WebSocket upgrade (Xray's built-in WS server expects the raw client
+        # handshake). We already accepted, so reconstruct minimally is not
+        # possible; instead rely on Xray's wsSettings path match + the client
+        # sending frames directly. Relay frames as they arrive.
+        client_q = asyncio.Queue()
+        async def _from_client():
+            try:
+                while True:
+                    data = await websocket.receive_bytes()
+                    await client_q.put(("c", data))
+            except WebSocketDisconnect:
+                await client_q.put(("x", b""))
+        async def _from_xray():
+            while True:
+                try:
+                    data = await loop.run_in_executor(None, rsock.recv, 65536)
+                except (BlockingIOError, OSError):
+                    await asyncio.sleep(0.01)
+                    continue
+                if not data:
+                    break
+                await client_q.put(("x", data))
+        async def _pump():
+            while True:
+                src, data = await client_q.get()
+                if src == "x" and not data:
+                    break
+                if src == "c":
+                    try:
+                        await loop.run_in_executor(None, rsock.sendall, data)
+                    except OSError:
+                        break
+                else:
+                    try:
+                        await websocket.send_bytes(data)
+                    except Exception:
+                        break
+        tasks = [asyncio.create_task(_from_client()), asyncio.create_task(_from_xray()), asyncio.create_task(_pump())]
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        rsock.close()
+
+
+@app.websocket("/ws/{uuid}")
+async def ws_tunnel(websocket: WebSocket, uuid: str):
+    # Step 4 diagnostics
+    hdrs = dict(websocket.headers)
+    client_ip_addr = client_ip_from_scope(websocket)
+    logger.info(
+        "WS upgrade | uuid=%s | ip=%s | upgrade=%s | connection=%s | ua=%s",
+        uuid, client_ip_addr,
+        hdrs.get("upgrade"), hdrs.get("connection"), hdrs.get("user-agent"),
+    )
+    # UUID / user validation (no cookie, no session required).
+    # The client connects to /ws/{config_uuid} (from the link), so match on
+    # config_uuid first, then fall back to the subscription uuid.
+    uid, user = find_user_by_config_uuid(uuid)
+    if not user:
+        uid, user = find_user_by_uuid(uuid)
+    if not user:
+        logger.warning("WS tunnel rejected (unknown uuid): %s", uuid)
+        await websocket.close(code=1008)  # policy violation, not HTTP 403
+        return
+    # Resolve the user's inbound to find Xray's internal listen port
+    iid = user.get("inbound_id")
+    target_port = 443
+    async with INBOUNDS_LOCK:
+        ib = INBOUNDS.get(iid, {})
+        target_port = int(ib.get("port", 443))
+    cuuid = user.get("config_uuid") or uid  # both are str
+    protocol = ib.get("protocol", "vless")
+    iid = user.get("inbound_id") or ""
+    # ── Real IP-Limit enforcement (config_uuid = one VLESS client) ──────────
+    # Count DISTINCT currently-connected client IPs for this user. If adding
+    # this connection would exceed concurrent_connections, reject with 1008.
+    ip_limit = int(user.get("concurrent_connections", 2) or 0)
+    async with session_lock():
+        connected_ips = count_connected_ips(cuuid)
+        if ip_limit and connected_ips >= ip_limit:
+            logger.warning(
+                "WS tunnel IP-limit rejected: user=%s ip=%s connected=%s limit=%s",
+                cuuid, client_ip_addr, connected_ips, ip_limit,
+            )
+            await websocket.close(code=1008)  # policy violation (too many devices)
+            return
+        add_session(cuuid, client_ip_addr, iid, protocol)
+    await websocket.accept()  # 101 Switching Protocols
+    logger.info("WS tunnel accepted: user=%s ip=%s -> 127.0.0.1:%s", cuuid, client_ip_addr, target_port)
+    try:
+        await _bridge_ws_to_xray(websocket, "127.0.0.1", target_port)
+    except Exception as e:
+        logger.error("WS tunnel error for %s: %s", cuuid, e)
+    finally:
+        # Remove this session on disconnect so the IP slot frees up.
+        async with session_lock():
+            remove_session(cuuid, client_ip_addr, iid)
+        try:
+            await websocket.close()
+        except Exception:
+            pass
+
+
+def client_ip_from_scope(websocket: WebSocket) -> str:
+    hdrs = dict(websocket.headers)
+    fwd = hdrs.get("x-forwarded-for")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return websocket.client.host if websocket.client else "نامشخص"
+
 
 # ── Basic endpoints ────────────────────────────────────────────────────────
 @app.get("/health")

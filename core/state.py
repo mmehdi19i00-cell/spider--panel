@@ -56,6 +56,102 @@ GROUPS: Dict = {}
 IP_POOL: List = []
 IP_BLACKLIST: Set = set()
 USER_IP_MAP: Dict = defaultdict(set)  # user_id -> set of IPs used
+# ── Domains ──────────────────────────────────────────────────────────────
+# Domain Manager: multiple domains, exactly one active. WS/TLS configs use the
+# active domain for address/host/sni; Reality keeps its own external_domain.
+DOMAINS: Dict = {}  # domain_id -> {domain, description, is_active, created_at, updated_at}
+ACTIVE_DOMAIN: str = ""  # cache of the currently active domain (kept in sync)
+
+# ── Live connection / session tracking (real IP-limit enforcement) ────────
+# connections: config_uuid -> list of session dicts:
+#   {ip, inbound_id, protocol, first_seen, last_seen}
+# A session is added when a tunnel opens and removed when it closes. The
+# number of DISTINCT ips is compared against the user's concurrent_connections
+# (IP limit) before accepting a new tunnel.
+# sessions live in memory only (rebuilt on restart from Xray API if available);
+# user IP-limit state is not required to survive restart.
+_SESSIONS: Dict = defaultdict(list)  # config_uuid -> [session, ...]
+_SESSIONS_LOCK = asyncio.Lock()
+
+
+def get_active_domain() -> str:
+    """Return the active domain (used by WS/TLS config generation)."""
+    global ACTIVE_DOMAIN
+    if ACTIVE_DOMAIN:
+        return ACTIVE_DOMAIN
+    for d in DOMAINS.values():
+        if d.get("is_active"):
+            ACTIVE_DOMAIN = d["domain"]
+            return ACTIVE_DOMAIN
+    return ""
+
+
+def set_active_domain(domain_id: str) -> bool:
+    """Make exactly one domain active. Returns True on success."""
+    global ACTIVE_DOMAIN
+    if domain_id not in DOMAINS:
+        return False
+    for did, d in DOMAINS.items():
+        d["is_active"] = (did == domain_id)
+        d["updated_at"] = datetime.now().isoformat()
+    ACTIVE_DOMAIN = DOMAINS[domain_id]["domain"]
+    return True
+
+
+def add_domain(domain: str, description: str = "") -> str:
+    """Add a domain. First domain added becomes active automatically."""
+    global ACTIVE_DOMAIN
+    did = generate_uuid()
+    is_first = len(DOMAINS) == 0
+    now = datetime.now().isoformat()
+    DOMAINS[did] = {
+        "domain": domain,
+        "description": description,
+        "is_active": is_first,  # first domain is auto-active
+        "created_at": now,
+        "updated_at": now,
+    }
+    if is_first:
+        ACTIVE_DOMAIN = domain
+    return did
+
+
+def ensure_default_domain(panel_host: str):
+    """On first run (no domains), seed the panel's own host as the active domain."""
+    if not DOMAINS:
+        add_domain(panel_host or "localhost", "Default panel domain")
+
+
+# ── Session helpers ────────────────────────────────────────────────────────
+def active_sessions(config_uuid: str) -> list:
+    return _SESSIONS.get(config_uuid, [])
+
+
+def count_connected_ips(config_uuid: str) -> int:
+    """Number of distinct client IPs currently connected for this user."""
+    return len({s["ip"] for s in _SESSIONS.get(config_uuid, [])})
+
+
+def add_session(config_uuid: str, ip: str, inbound_id: str, protocol: str) -> dict:
+    now = datetime.now().isoformat()
+    sess = {"ip": ip, "inbound_id": inbound_id, "protocol": protocol,
+            "first_seen": now, "last_seen": now}
+    _SESSIONS[config_uuid].append(sess)
+    return sess
+
+
+def remove_session(config_uuid: str, ip: str, inbound_id: str):
+    lst = _SESSIONS.get(config_uuid)
+    if not lst:
+        return
+    for i, s in enumerate(lst):
+        if s["ip"] == ip and s["inbound_id"] == inbound_id:
+            lst.pop(i)
+            break
+
+
+def session_lock():
+    return _SESSIONS_LOCK
 
 # Auth
 AUTH = {"password_hash": hash_password(os.environ.get("ADMIN_PASSWORD", "admin"))}
@@ -96,6 +192,15 @@ def find_user_by_uuid(user_uuid: str) -> "tuple[str | None, dict | None]":
     """Resolve a user by subscription uuid. Returns (user_id, user) or (None, None)."""
     for uid, u in USERS.items():
         if u.get("uuid") == user_uuid:
+            return uid, u
+    return None, None
+
+def find_user_by_config_uuid(config_uuid: str) -> "tuple[str | None, dict | None]":
+    """Resolve a user by their VLESS config_uuid. The WS tunnel path is
+    /ws/{config_uuid} (from the generated link), so the tunnel must match on
+    config_uuid, NOT the subscription uuid. Returns (user_id, user)."""
+    for uid, u in USERS.items():
+        if u.get("config_uuid") == config_uuid:
             return uid, u
     return None, None
 
@@ -187,7 +292,7 @@ def _migrate_user_links():
 # ── Persistence ────────────────────────────────────────────────────────────
 async def load_state():
     """Load state from JSON file."""
-    global LINKS, SUBS, USERS, SETTINGS, GROUPS, INBOUNDS, IP_POOL, IP_BLACKLIST
+    global LINKS, SUBS, USERS, SETTINGS, GROUPS, INBOUNDS, IP_POOL, IP_BLACKLIST, DOMAINS, ACTIVE_DOMAIN
     try:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         if DATA_FILE.exists():
@@ -210,6 +315,19 @@ async def load_state():
             IP_POOL.extend(data.get("ip_pool", []))
             IP_BLACKLIST.clear()
             IP_BLACKLIST.update(data.get("ip_blacklist", []))
+            DOMAINS.clear()
+            DOMAINS.update(data.get("domains", {}))
+            # Rebuild active-domain cache.
+            global ACTIVE_DOMAIN
+            ACTIVE_DOMAIN = ""
+            for d in DOMAINS.values():
+                if d.get("is_active"):
+                    ACTIVE_DOMAIN = d["domain"]
+                    break
+            # Seed the panel's own host as the default active domain if none
+            # exist (runs on every load_state so the active domain is always
+            # available even if the startup lifespan was skipped, e.g. TestClient).
+            ensure_default_domain(get_host())
     except Exception as e:
         print(f"Could not load state: {e}")
     # Backfill a stable `uuid` for every user (subscription identifier).
@@ -245,6 +363,7 @@ async def save_state():
                 "inbounds": dict(INBOUNDS),
                 "ip_pool": list(IP_POOL),
                 "ip_blacklist": list(IP_BLACKLIST),
+                "domains": dict(DOMAINS),
                 "password_hash": AUTH["password_hash"],
                 "saved_secret": CONFIG["secret"],
                 "saved_at": datetime.now(timezone.utc).isoformat(),
