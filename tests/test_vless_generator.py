@@ -36,9 +36,9 @@ def test_reality_xhttp():
             "reality_settings": {
                 "private_key": "AAAABBBBprivate",
                 "public_key":  "h1Qcuf3ZA9ea9XEPkVN6jV1CClO2c7qhEjQo6fmZJnM",
-                "short_id": "5a3ff5a13d",
+                "short_ids": "5a3ff5a13d",
                 "sni": "is1-ssl.mzstatic.com",
-                "serverNames": ["is1-ssl.mzstatic.com"],
+                "server_names": ["is1-ssl.mzstatic.com"],
                 "spiderx": "/",
                 "dest": "is1-ssl.mzstatic.com:443",
             },
@@ -88,9 +88,9 @@ def test_reality_ws():
             "reality_settings": {
                 "private_key": "pk",
                 "public_key":  "PUBKEY123",
-                "short_id": "abcdef1234",
+                "short_ids": "abcdef1234",
                 "sni": "is1-ssl.mzstatic.com",
-                "serverNames": ["is1-ssl.mzstatic.com"],
+                "server_names": ["is1-ssl.mzstatic.com"],
                 "spiderx": "/",
             },
             "ws_settings": {"path": "/myrealws", "host": "hayabusa.proxy.rlwy.net"},
@@ -144,7 +144,7 @@ def test_reality_incomplete_raises():
             "external_port": 22124,
             "reality_settings": {
                 # missing private_key/public_key AND sni
-                "short_id": "abcdef1234",
+                "short_ids": "abcdef1234",
             },
         }
     })

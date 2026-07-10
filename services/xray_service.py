@@ -235,14 +235,10 @@ async def generate_reality_keys() -> Tuple[str, str, str]:
 async def ensure_reality_keys(inbound_id: str) -> Dict[str, Any]:
     """Ensure a Reality inbound has real, persisted keys (idempotent).
 
-    - If private_key/public_key already exist in INBOUNDS (from a previous run
-      or persisted state), reuse them. NEVER regenerate on restart.
-    - Otherwise generate a keypair with `xray x25519`, generate a short_id,
-      persist to the inbound config + state file, and return reality_settings.
-
-    The sni / serverNames are external facts (the TLS server we mimic) that the
-    operator must configure; they are NOT fabricated here. If missing, raises
-    RealityIncompleteError.
+    Reality settings are stored with snake_case keys (private_key, public_key,
+    short_ids, server_names, sni, spiderx, dest) — matching the dashboard UI
+    and the Xray config we generate. Backward-compatible reads of the old
+    singular/camelCase keys are kept so existing state files still load.
     """
     inbound = INBOUNDS.get(inbound_id)
     if inbound is None:
@@ -250,21 +246,35 @@ async def ensure_reality_keys(inbound_id: str) -> Dict[str, Any]:
 
     rs = inbound.setdefault("reality_settings", {})
 
+    # Normalize old key shapes into the canonical snake_case form.
+    if rs.get("private_key") is None and rs.get("privateKey"):
+        rs["private_key"] = rs.pop("privateKey")
+    if rs.get("public_key") is None and rs.get("publicKey"):
+        rs["public_key"] = rs.pop("publicKey")
+    if rs.get("short_ids") is None:
+        if rs.get("short_id"):
+            rs["short_ids"] = rs["short_id"]
+        elif rs.get("shortIds"):
+            rs["short_ids"] = rs["shortIds"][0] if isinstance(rs["shortIds"], list) else rs["shortIds"]
+    if rs.get("server_names") is None and rs.get("serverNames"):
+        rs["server_names"] = rs["serverNames"]
+    if rs.get("spiderx") is None and rs.get("spiderX"):
+        rs["spiderx"] = rs["spiderX"]
+
     if not rs.get("private_key") or not rs.get("public_key"):
         private_key, public_key = await generate_reality_keypair()
         rs["private_key"] = private_key
         rs["public_key"] = public_key
-        if not rs.get("short_id"):
-            rs["short_id"] = secrets.token_hex(8)
+        if not rs.get("short_ids"):
+            rs["short_ids"] = secrets.token_hex(8)
 
-    # sni / serverNames are real, operator-provided facts. We must not invent them.
-    if not rs.get("sni") and not rs.get("serverNames"):
+    # sni / server_names are real, operator-provided facts. We must not invent them.
+    if not rs.get("sni") and not rs.get("server_names"):
         raise RealityIncompleteError(["sni"])
-
-    if not rs.get("serverNames"):
-        rs["serverNames"] = [rs["sni"]]
+    if not rs.get("server_names"):
+        rs["server_names"] = [rs["sni"]]
     if not rs.get("sni"):
-        rs["sni"] = rs["serverNames"][0]
+        rs["sni"] = rs["server_names"][0]
 
     rs.setdefault("dest", f"{rs['sni']}:443")
     rs.setdefault("spiderx", "/")
@@ -290,16 +300,16 @@ def get_reality_export(inbound_id: str) -> Dict[str, str]:
     missing = []
     if not rs.get("public_key"):
         missing.append("pbk")
-    if not rs.get("short_id"):
+    if not rs.get("short_ids"):
         missing.append("sid")
-    if not rs.get("sni") and not rs.get("serverNames"):
+    if not rs.get("sni") and not rs.get("server_names"):
         missing.append("sni")
     if missing:
         raise RealityIncompleteError(missing)
     return {
         "pbk": rs["public_key"],
-        "sid": rs["short_id"],
-        "sni": rs.get("sni") or rs["serverNames"][0],
+        "sid": rs["short_ids"][0] if isinstance(rs["short_ids"], list) else rs["short_ids"],
+        "sni": rs.get("sni") or (rs["server_names"][0] if rs.get("server_names") else ""),
         "spx": rs.get("spiderx", "/"),
         "fp": rs.get("fingerprint", "chrome"),
     }
@@ -473,12 +483,14 @@ def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
         # Use the REAL persisted Reality keys. Never fabricate a shortId or sni.
         if not rs.get("private_key") or not rs.get("public_key"):
             raise RealityIncompleteError(["pbk"])
-        if not rs.get("short_id"):
+        if not rs.get("short_ids"):
             raise RealityIncompleteError(["sid"])
-        sni_for_reality = rs.get("sni") or (rs.get("serverNames") or [None])[0]
+        sni_for_reality = rs.get("sni") or (rs.get("server_names") or [None])[0]
         if not sni_for_reality:
             raise RealityIncompleteError(["sni"])
-        server_names = rs.get("serverNames") or [sni_for_reality]
+        server_names = rs.get("server_names") or [sni_for_reality]
+        short_ids_raw = rs.get("short_ids")
+        short_ids_list = short_ids_raw if isinstance(short_ids_raw, list) else [short_ids_raw]
         inbound_obj["streamSettings"] = {
             "network": network if network in ("tcp", "xhttp", "grpc") else "tcp",
             "security": "reality",
@@ -488,7 +500,7 @@ def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
                 "xver": 0,
                 "serverNames": server_names,
                 "privateKey": rs["private_key"],
-                "shortIds": [rs["short_id"]],
+                "shortIds": short_ids_list,
                 "spiderX": rs.get("spiderx", "/"),
             }
         }

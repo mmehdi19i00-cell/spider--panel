@@ -55,6 +55,7 @@ from services.xray_service import (
 # so there is no circular import.
 from xhttp_siz10 import router as xhttp_router
 from routers.web import router as web_router
+from routers.api import router as api_router
 
 # ── Telegram First-Run Paths ───────────────────────────────────────────────
 TELEGRAM_FLAG_FILE = DATA_DIR / "telegram_seen.flag"
@@ -79,6 +80,7 @@ if STATIC_DIR.exists():
 # Include routers
 app.include_router(xhttp_router)
 app.include_router(web_router)
+app.include_router(api_router)
 
 # ── HTTP Client ────────────────────────────────────────────────────────────
 http_client: httpx.AsyncClient | None = None

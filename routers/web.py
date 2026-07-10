@@ -122,7 +122,8 @@ async def _user_config_payload(user_id: str) -> dict:
         except Exception as e:  # noqa: BLE001
             return {"success": False, "error": str(e), "inbound_id": iid}
 
-    return {"success": True, "user": user.get("username", user_id), "configs": configs}
+    return {"success": True, "user": user.get("username", user_id), "configs": configs,
+            "config": configs[0]["link"] if configs else ""}
 
 
 @router.get("/api/users/{user_id}/config")
