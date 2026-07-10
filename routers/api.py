@@ -43,6 +43,7 @@ from services.xray_service import (
     restart_xray,
     generate_xray_server_config,
 )
+from core.state import allocate_inbound_port
 
 router = APIRouter()
 
@@ -290,10 +291,15 @@ def _normalize_reality(body: CreateInboundReq) -> dict:
 @router.post("/api/inbounds")
 async def create_inbound(body: CreateInboundReq):
     iid = generate_uuid()
+    # Allocate a unique internal listen port unless the caller pinned one.
+    # Never collide with the FastAPI web port or another inbound's port.
+    internal_port = body.port
+    if not internal_port or internal_port <= 0:
+        internal_port = allocate_inbound_port(body.network or "tcp")
     ib = {
         "name": body.name or "اینباند جدید",
         "protocol": body.protocol,
-        "port": body.port,
+        "port": internal_port,
         "external_port": body.external_port,
         "external_domain": body.external_domain,
         "network": body.network,
@@ -326,10 +332,14 @@ async def update_inbound(iid: str, body: CreateInboundReq):
         ib = INBOUNDS.get(iid)
         if not ib:
             raise HTTPException(status_code=404, detail="اینباند یافت نشد")
+        # Keep a pinned port; otherwise re-allocate a non-conflicting one.
+        internal_port = body.port
+        if not internal_port or internal_port <= 0:
+            internal_port = allocate_inbound_port(body.network or ib.get("network", "tcp"))
         ib.update({
             "name": body.name or ib.get("name", ""),
             "protocol": body.protocol,
-            "port": body.port,
+            "port": internal_port,
             "external_port": body.external_port,
             "external_domain": body.external_domain,
             "network": body.network,

@@ -19,6 +19,19 @@
     radial-gradient(1200px 600px at 12% -8%, rgba(47,111,237,.10), transparent 60%),
     radial-gradient(1000px 520px at 88% 4%, rgba(224,36,78,.08), transparent 60%),
     radial-gradient(900px 600px at 50% 110%, rgba(107,63,214,.08), transparent 60%);
+  background-size:180% 180%;
+  animation:bgFloat 22s ease-in-out infinite;
+}
+[data-theme="light"] body::before{
+  content:"";
+  position:fixed; inset:-20%;
+  background:
+    radial-gradient(40% 40% at 30% 30%, rgba(47,111,237,.05), transparent 70%),
+    radial-gradient(35% 35% at 70% 60%, rgba(224,36,78,.04), transparent 70%);
+  filter:blur(40px);
+  z-index:-1;
+  animation:bgOrbit 30s ease-in-out infinite;
+  pointer-events:none;
 }
 [data-theme="light"] .card{
   background:#ffffff;

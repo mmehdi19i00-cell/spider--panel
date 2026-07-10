@@ -49,7 +49,11 @@ SETTINGS = {
     "panel_audio": "",
     "panel_audio_enabled": False,
     "reality": {
-        "port": 1234,
+        # NOTE: this is only a *suggestion*. The real internal Xray port is
+        # allocated at inbound-creation time by services.xray_ports so it never
+        # collides with the FastAPI web port or another inbound. Do not treat
+        # this literal 1234 as a bind port.
+        "port": int(os.environ.get("XRAY_REALITY_PORT", 1234)),
         "dest": "is1-ssl.mzstatic.com:443",
         "sni": "is1-ssl.mzstatic.com",
         "public_key": "",

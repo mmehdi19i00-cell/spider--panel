@@ -20,6 +20,10 @@ from config import (
     DATA_DIR, DATA_FILE, IRAN_TZ, SETTINGS, CONFIG,
     hash_password, get_host,
 )
+# NOTE: port logic lives in services.xray_ports, but importing it at module top
+# would create a circular import (services/__init__ -> xray_service -> core.state
+# -> xray_ports -> services/__init__). So we import it lazily inside the helpers
+# that need it (allocate_inbound_port / external_port_for).
 
 # ── Locks ──────────────────────────────────────────────────────────────────
 SAVE_LOCK = asyncio.Lock()
@@ -177,6 +181,22 @@ def generate_random_path(prefix: str = "", length: int = 6) -> str:
     if prefix:
         return f"/{prefix}-{secrets.token_hex(length)}"
     return f"/{secrets.token_hex(length)}"
+
+def allocate_inbound_port(purpose: str, fixed: int | None = None) -> int:
+    """Allocate a free internal Xray port for a new/updated inbound.
+
+    Guarantees no collision with the FastAPI web port (CONFIG['port']) or any
+    other inbound's port. ``purpose`` is 'ws' / 'reality' / 'grpc' / 'tcp'.
+    """
+    from services.xray_ports import allocate_internal_port, collect_used_internal_ports
+    used = collect_used_internal_ports(INBOUNDS)
+    return allocate_internal_port(purpose, used, fixed)
+
+def external_port_for(inbound: dict) -> int:
+    """Public port a client should use, per the inbound + Railway topology."""
+    from services.xray_ports import public_port_for_internal
+    internal = int(inbound.get("port", 0) or 0)
+    return public_port_for_internal(internal, inbound.get("external_port"))
 
 def now_ir() -> datetime:
     return datetime.now(IRAN_TZ)

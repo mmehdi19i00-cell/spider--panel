@@ -27,7 +27,11 @@ from config import (
     XRAY_BINARY_PATH, XRAY_CONFIG_PATH, XRAY_ASSETS_DIR, XRAY_LOG_DIR,
     hash_password,
 )
-from core.state import generate_uuid, INBOUNDS, INBOUNDS_LOCK, save_state, USERS, get_active_domain
+from core.state import generate_uuid, INBOUNDS, INBOUNDS_LOCK, save_state, USERS, get_active_domain, external_port_for
+from services.xray_ports import (
+    is_port_available, collect_used_internal_ports, public_port_for_internal,
+    RAILWAY_TCP_PROXIES, WEB_PORT_ENV,
+)
 import aiofiles
 
 logger = logging.getLogger("xray_service")
@@ -434,20 +438,27 @@ def generate_vless_link(
     ip_limit = int(user.get("concurrent_connections", 2) if user else 2)
     if ip_limit < 0:
         raise ValueError(f"Invalid IP limit: {ip_limit}")
-    # WS/TLS requires an active domain (Domain Manager) to point the link at.
+    # WS/TLS requires a resolvable host (Domain Manager active domain preferred,
+    # but fall back to the inbound's own domain so a manually-created inbound
+    # still yields a link). The API always seeds an active domain at startup.
     if security != "reality" and network in ("ws", "xhttp"):
-        if not get_active_domain():
+        _ws_host = get_active_domain() or inbound.get("external_domain") or inbound.get("domain") or SETTINGS.get("domain") or get_host()
+        if not _ws_host:
             raise RuntimeError("No active domain configured; cannot generate WS/TLS link")
 
     # ── Public endpoint (NEVER internal listen port) ──────────────────────
     # For WS/TLS the address/host/sni MUST come from the ACTIVE domain manager
     # domain (so changing the active domain re-points all ws configs on the
     # next generate). Reality keeps its own external_domain/serverNames.
+    # The *external* port is the public-facing port: for WS/TLS that is 443
+    # (Railway HTTPS edge) unless an explicit external_port is set; for Reality
+    # it is the Railway TCP-proxy public port (e.g. 29362) discovered from the
+    # container's internal port, never 443.
     if security == "reality":
         host = inbound.get("external_domain") or inbound.get("domain") or SETTINGS.get("domain") or get_host()
     else:
         host = get_active_domain() or inbound.get("external_domain") or inbound.get("domain") or SETTINGS.get("domain") or get_host()
-    port = inbound.get("external_port", 443)
+    port = external_port_for(inbound)
 
     # ── Validation: external endpoint must exist ──────────────────────────
     if not host:
@@ -489,10 +500,12 @@ def generate_vless_link(
         # domain (same as address/sni). Falls back to the inbound's own
         # external_domain only if no active domain is configured.
         params["host"] = host if (host == get_active_domain() or not inbound.get("external_domain")) else (inbound.get("external_domain") or host)
-        # ws path must EXACTLY match the server-side wsSettings.path.
-        # Shared per-inbound path /ws/{inbound id}; Xray authenticates the user
-        # by the VLESS client uuid, so a single path serves all users.
-        params["path"] = ws.get("path") or f"/ws/{inbound_id or iid}"
+        # ws path: PER-USER. The server's wsSettings.path is the *prefix*
+        # (e.g. "/ws" or a custom one). Xray matches by HasPrefix, so the link
+        # path is {prefix}/{config_uuid}; the tunnel resolves the user by
+        # config_uuid. A custom prefix is preserved on both sides.
+        prefix = (ws.get("path") or "/ws")
+        params["path"] = prefix.rstrip("/") + "/" + uuid
         params["alpn"] = "http/1.1"
     elif network == "xhttp":
         xh = inbound.get("xhttp_settings", {})
@@ -549,17 +562,16 @@ def generate_xray_server_config(inbound_id: Optional[str] = None) -> Dict[str, A
     return config
 
 def _ws_path_for_inbound(iid: str, ws_settings: dict) -> str:
-    """ws path that EXACTLY matches the client link.
+    """Server-side WS path = the SHARED prefix ``/ws``.
 
-    The path is shared per-inbound (/ws/{inbound id}). Xray authenticates the
-    user via the VLESS client uuid inside the frame, NOT via the path, so a
-    single shared inbound path works for every user and — critically — always
-    matches the generated subscription link. A per-user path here would only
-    match the FIRST linked user's link and silently break everyone else.
+    Xray's wsSettings.path is matched with ``strings.HasPrefix`` (NOT an exact
+    equal), so a single inbound path of ``/ws`` accepts every client upgrade
+    ``/ws/{config_uuid}``. The per-user tail is what identifies the client to
+    the tunnel (which resolves the user by config_uuid); it must NOT be folded
+    into the server path or only the literal path would match. An explicit
+    ws_settings.path is still honored for custom setups.
     """
-    if ws_settings.get("path"):
-        return ws_settings["path"]
-    return f"/ws/{iid}"
+    return ws_settings.get("path") or "/ws"
 
 
 def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
@@ -574,7 +586,25 @@ def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
     ws_settings = ib.get("ws_settings", {})
     xh_settings = ib.get("xhttp_settings", {})
     grpc_settings = ib.get("grpc_settings", {})
-    
+
+    # Port-collision guard: never let an Xray internal port equal the web
+    # (FastAPI) port or another inbound's port. Catching it here means we log a
+    # clear component + reason instead of Xray failing to bind at launch.
+    external = public_port_for_internal(port, ib.get("external_port"))
+    if port == WEB_PORT_ENV:
+        raise RuntimeError(
+            f"Inbound {iid}: internal port {port} collides with the FastAPI web "
+            f"port {WEB_PORT_ENV}. Assign a different internal port."
+        )
+    for other_iid, other in INBOUNDS.items():
+        if other_iid == iid:
+            continue
+        if int(other.get("port", 0) or 0) == port:
+            raise RuntimeError(
+                f"Inbound {iid}: internal port {port} already used by inbound "
+                f"{other_iid}. Ports must be unique."
+            )
+
     inbound_obj = {
         "tag": f"inbound-{iid}",
         "port": port,
@@ -753,7 +783,32 @@ async def start_xray(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         
         if config is None:
             config = generate_xray_server_config()
-        
+
+        # Detailed per-inbound log (objective #13): uuid, tag, ports, reality,
+        # pbk, sid. Surfaced BEFORE launch so a bad config is traceable.
+        for cin in config.get("inbounds", []):
+            tag = cin.get("tag", "?")
+            iport = cin.get("port")
+            ext = public_port_for_internal(int(iport or 0), None)
+            clients = cin.get("settings", {}).get("clients", [])
+            uuids = ", ".join(c.get("id", "") for c in clients) or "(none yet)"
+            ss = cin.get("streamSettings", {})
+            net = ss.get("network")
+            sec = ss.get("security")
+            rk = (ss.get("realitySettings") or {})
+            logger.info(
+                "Xray inbound %s | internal=%s external=%s net=%s sec=%s clients=[%s]%s",
+                tag, iport, ext, net, sec, uuids,
+                f" reality pbk={rk.get('publicKey','')[:12]}… sid={rk.get('shortIds')}" if rk else "",
+            )
+
+        # Reject if any internal port is already taken by something else on the
+        # host (defense in depth beyond the config-level uniqueness check).
+        for cin in config.get("inbounds", []):
+            iport = int(cin.get("port") or 0)
+            if iport and not is_port_available(iport):
+                return {"ok": False, "error": f"Internal port {iport} already in use on host"}
+
         valid, error = await validate_xray_config(config)
         if not valid:
             # Write the bad config to disk so it can be inspected manually:
@@ -790,7 +845,7 @@ async def start_xray(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
             asyncio.create_task(_read_xray_logs(_xray_process.stdout, "stdout"))
             asyncio.create_task(_read_xray_logs(_xray_process.stderr, "stderr"))
             
-            logger.info(f"Xray started with PID {_xray_process.pid}")
+            logger.info(f"Xray reload OK | pid={_xray_process.pid} | inbounds={len(config.get('inbounds', []))} | RailwayTCP={RAILWAY_TCP_PROXIES}")
             return {"ok": True, "pid": _xray_process.pid, "message": "Xray started"}
         except Exception as e:
             logger.error(f"Failed to start Xray: {e}")

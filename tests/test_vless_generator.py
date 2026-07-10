@@ -103,7 +103,7 @@ def test_reality_ws():
     assert q["type"][0] == "ws"
     assert q["pbk"][0] == "PUBKEY123"
     assert q["sid"][0] == "abcdef1234"
-    assert q["path"][0] == "/myrealws", link
+    assert q["path"][0] == "/myrealws/11111111-2222-3333-4444-555555555555", link
     print("Reality+ws OK:\n ", link)
 
 
@@ -128,7 +128,7 @@ def test_tls_ws():
     assert q["security"][0] == "tls"
     assert q["type"][0] == "ws"
     assert "pbk" not in q, "pbk must NOT appear for non-reality"
-    assert q["path"][0] == "/wspublic"
+    assert q["path"][0] == "/wspublic/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     print("TLS+ws OK:\n ", link)
 
 

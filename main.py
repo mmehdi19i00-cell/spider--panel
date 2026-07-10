@@ -150,12 +150,13 @@ async def startup():
     # Auto-create default inbound if none exist
     async with INBOUNDS_LOCK:
         if not INBOUNDS:
-            from core.state import generate_uuid
+            from core.state import generate_uuid, allocate_inbound_port
             default_iid = generate_uuid()
+            default_port = allocate_inbound_port("ws")  # non-conflicting internal port
             INBOUNDS[default_iid] = {
                 "name": "VLESS+WS پیش‌فرض",
                 "protocol": "vless",
-                "port": 443,
+                "port": default_port,
                 "network": "ws",
                 "security": "tls",
                 "domain": SETTINGS.get("domain", get_host()),
@@ -347,8 +348,10 @@ async def ws_tunnel(websocket: WebSocket, uuid: str):
     await websocket.accept()  # 101 Switching Protocols
     logger.info("WS tunnel accepted: user=%s ip=%s -> 127.0.0.1:%s", cuuid, client_ip_addr, target_port)
     try:
-        # The inbound's internal WS path MUST match the client link's path,
-        # otherwise Xray's wsSettings path check rejects the upgrade.
+        # The inbound's internal WS path is the shared prefix "/ws"; Xray
+        # matches the client upgrade /ws/{config_uuid} by HasPrefix, so the
+        # bridge connects to the same "/ws" path. The per-user tail is used by
+        # the tunnel (above) to resolve the user, not by Xray's path match.
         ws_path = _ws_path_for_inbound(iid, ib.get("ws_settings", {}))
         await _bridge_ws_to_xray(websocket, "127.0.0.1", target_port, ws_path)
     except Exception as e:

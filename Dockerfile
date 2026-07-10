@@ -87,12 +87,15 @@ ENV PYTHONUNBUFFERED=1 \
     XRAY_ASSETS_DIR=/app/xray-assets \
     XRAY_LOG_DIR=/app/xray-logs
 
-# Expose port
-EXPOSE 8000
+# Expose the web port (Railway injects $PORT; default 8080). This is ONLY the
+# FastAPI/HTTP port. Xray listens on SEPARATE internal ports (XRAY_WS_PORT=8443,
+# XRAY_REALITY_PORT=1234 by default, or auto-allocated) — never on $PORT — so
+# there is no bind conflict between FastAPI and Xray.
+EXPOSE 8080
 
-# Health check
+# Health check honours $PORT (Railway's web port), not a hardcoded value.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=5)" || exit 1
+    CMD python -c "import os,httpx; httpx.get('http://localhost:'+os.environ.get('PORT','8080')+'/health', timeout=5)" || exit 1
 
-# Start command
+# Start command: uvicorn binds $PORT (Railway web), Xray on its own internal ports.
 CMD ["python", "main.py"]
