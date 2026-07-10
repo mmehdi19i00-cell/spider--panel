@@ -20,6 +20,7 @@ from core.state import (
     USERS, USERS_LOCK,
     INBOUNDS, INBOUNDS_LOCK,
     SESSIONS, SESSIONS_LOCK,
+    find_user_by_uuid, find_user_by_username,
     is_link_allowed,
 )
 from services.xray_service import (
@@ -88,7 +89,7 @@ async def _user_config_payload(user_id: str) -> dict:
         return {"success": False, "error": "user not found", "status_code": 404}
 
     # Collect inbounds this user is allowed to use.
-    inbound_ids = user.get("inbound_ids") or list(INBOUNDS.keys())
+    inbound_ids = [user.get("inbound_id")] if user.get("inbound_id") else list(INBOUNDS.keys())
     configs = []
     for iid in inbound_ids:
         inbound = INBOUNDS.get(iid)
@@ -138,28 +139,26 @@ async def user_config(user_id: str, request: Request):
     return JSONResponse(payload, status_code=status)
 
 
-@router.get("/api/sub/{username}")
-async def user_subscription(username: str, request: Request):
+@router.get("/api/sub/{key}")
+async def user_subscription(key: str, request: Request):
     """Per-user subscription data consumed by static/sub.html.
+
+    `key` may be the user's subscription uuid OR (legacy) username. Resolves
+    uuid first, then falls back to username for backward compatibility.
 
     Returns the exact shape the viewer expects:
       config (first VLESS link), traffic_used_bytes, traffic_limit_bytes,
       expire_days, username, protocol, status, concurrent_connections.
     """
-    # Resolve username -> user_id
-    async with USERS_LOCK:
-        user_id = None
-        user = None
-        for uid, u in USERS.items():
-            if u.get("username") == username:
-                user_id = uid
-                user = u
-                break
-    if not user_id or user is None:
+    # Resolve uuid -> user (preferred), else username (legacy).
+    uid, user = find_user_by_uuid(key)
+    if uid is None:
+        uid, user = find_user_by_username(key)
+    if uid is None or user is None:
         return JSONResponse({"success": False, "error": "user not found"}, status_code=404)
 
     # Build the real VLESS config(s) for this user (Reality-aware).
-    payload = await _user_config_payload(user_id)
+    payload = await _user_config_payload(uid)
     configs = payload.get("configs", []) if payload.get("success") else []
     first_link = configs[0]["link"] if configs else ""
     if not payload.get("success") and payload.get("error"):
@@ -169,7 +168,7 @@ async def user_subscription(username: str, request: Request):
             "success": False,
             "error": payload.get("error"),
             "missing": payload.get("missing"),
-            "username": user.get("username", username),
+            "username": user.get("username", key),
         }, status_code=400)
 
     used = user.get("traffic_used_bytes", 0)
@@ -187,7 +186,8 @@ async def user_subscription(username: str, request: Request):
         "config": first_link,            # sub.html reads d.config
         "vless_link": first_link,
         "configs": configs,
-        "username": user.get("username", username),
+        "username": user.get("username", key),
+        "uuid": user.get("uuid", key),
         "protocol": (user.get("inbound_id") and INBOUNDS.get(user["inbound_id"], {}).get("protocol")) or "vless",
         "status": user.get("status", "active"),
         "concurrent_connections": user.get("concurrent_connections", 2),
@@ -195,6 +195,27 @@ async def user_subscription(username: str, request: Request):
         "traffic_limit_bytes": limit,
         "expire_days": expire_days,
     })
+
+
+@router.get("/sub/{key}")
+async def subscription_text(key: str, request: Request):
+    """Client-importable subscription: text/plain VLESS config(s) for a user.
+
+    `key` is the user's subscription uuid (preferred) or legacy username.
+    Importable directly by V2RayNG / Hiddify / Nekoray / Shadowrocket.
+    """
+    uid, user = find_user_by_uuid(key)
+    if uid is None:
+        uid, user = find_user_by_username(key)
+    if uid is None or user is None:
+        raise HTTPException(status_code=404, detail="اشتراک یافت نشد")
+    payload = await _user_config_payload(uid)
+    if not payload.get("success"):
+        raise HTTPException(status_code=400, detail=payload.get("error", "اشتراک ناقص است"))
+    links = [c["link"] for c in payload.get("configs", []) if c.get("link")]
+    if not links:
+        return Response(content="# Subscription has no active config.\n", media_type="text/plain; charset=utf-8")
+    return Response(content="\n".join(links), media_type="text/plain; charset=utf-8")
 
 
 # ── Login / Logout / Session API ─────────────────────────────────────────────

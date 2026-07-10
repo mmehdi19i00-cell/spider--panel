@@ -94,6 +94,7 @@ def _user_out(uid: str, u: dict) -> dict:
     inbound = INBOUNDS.get(inbound_id, {}) if inbound_id else {}
     return {
         "user_id": uid,
+        "uuid": u.get("uuid", uid),
         "username": u.get("username", ""),
         "traffic_used_bytes": u.get("traffic_used_bytes", 0),
         "traffic_limit_bytes": u.get("traffic_limit_bytes", 0),
@@ -163,6 +164,7 @@ async def create_user(body: CreateUserReq):
             expire_at = (datetime.now() + timedelta(days=body.expire_days)).isoformat()
         USERS[uid] = {
             "username": username,
+            "uuid": __import__("uuid").uuid4().hex,
             "config_uuid": generate_uuid(),
             "traffic_limit_bytes": limit_bytes,
             "traffic_used_bytes": 0,
@@ -411,10 +413,14 @@ async def tools_xray_status():
 @router.post("/api/tools/generate-reality-keys")
 async def tools_generate_reality_keys():
     try:
-        private_key, public_key = await generate_reality_keypair()
+        keys = await generate_reality_keypair()
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return {"private_key": private_key, "public_key": public_key}
+    return {
+        "private_key": keys.get("private_key", ""),
+        "public_key": keys.get("public_key", ""),
+        "hash32": keys.get("hash32", ""),
+    }
 
 
 @router.get("/api/tools/my-ip")

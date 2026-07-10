@@ -1012,7 +1012,7 @@ function renderUsers() {
     html += '<td><span class="badge badge-b">' + esc(inboundName) + '</span></td>';
     html += '<td><div class="act-row">';
     html += '<button class="btn btn-sm btn-g" onclick="viewCfg(\'' + u.user_id + '\')" title="Config">'+iconCfg+'</button>';
-    html += '<button class="btn btn-sm btn-g" onclick="viewSub(\'' + u.username + '\')" title="Sub Link">'+iconLink+'</button>';
+    html += '<button class="btn btn-sm btn-g" onclick="viewSub(\'' + (u.uuid || u.user_id) + '\')" title="Sub Link">'+iconLink+'</button>';
     html += '<button class="btn btn-sm btn-b" onclick="viewQR(\'' + u.user_id + '\')" title="QR Code">'+iconQr+'</button>';
     html += '<button class="btn btn-sm btn-b" onclick="editUser(\'' + u.user_id + '\')" title="Edit">'+iconEdit+'</button>';
     html += '<button class="btn btn-sm btn-r" onclick="toggleUser(\'' + u.user_id + '\')" title="Toggle">'+iconToggle+'</button>';
@@ -1109,7 +1109,7 @@ function copyCfg() {
   navigator.clipboard.writeText(curCfg).then(function() { toast('کانفیگ کپی شد', 'ok'); }).catch(function() { toast('خطا در کپی', 'err'); });
 }
 
-function viewSub(username) { window.open('/sub/' + username, '_blank'); }
+function viewSub(uuid) { window.open('/sub/' + uuid, '_blank'); }
 function viewQR(userId) { $id('qr-img').src = '/api/users/' + userId + '/qr?t=' + Date.now(); openModal('mod-qr'); }
 
 // ─── Inbounds ───

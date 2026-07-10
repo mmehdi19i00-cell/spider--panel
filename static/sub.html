@@ -130,7 +130,11 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 
 <script>
 var uname=window.location.pathname.split('/').pop();
-document.title='Spider | '+uname;
+// Prefer ?uuid= when opened as the rich viewer (/sub?uuid=...), else fall back
+// to the path segment (legacy /sub/{username}).
+var params=new URLSearchParams(window.location.search);
+var uuid=params.get('uuid')||uname;
+document.title='Spider | '+(params.get('uuid')?uuid:uname);
 
 function fm(b){if(!b||b<1)return'0 B';var u=['B','KB','MB','GB'];var i=0;while(b>=1024&&i<u.length-1){b/=1024;i++}return b.toFixed(i?2:0)+' '+u[i]}
 function tst(m){var t=document.getElementById('tst');t.textContent=m;t.classList.add('s');setTimeout(function(){t.classList.remove('s')},2000)}
@@ -139,15 +143,15 @@ var _cfg='',_subUrl='',_host='',_data=null;
 
 async function load(){
   try{
-    var r=await fetch('/api/sub/'+uname);
+    var r=await fetch('/api/sub/'+uuid);
     if(!r.ok) throw new Error(r.status===404?'کاربر یافت نشد':'خطای سرور');
     _data=await r.json();
     _cfg=_data.config||_data.vless_link||'';
     _host=window.location.origin;
-    _subUrl=_host+'/sub-sync/sub/'+uname;
+    _subUrl=_host+'/sub/'+uuid;
     render(_data);
   }catch(e){
-    document.getElementById('app').innerHTML='<div class="err"><h2>'+uname+'</h2><p>'+e.message+'</p><p style="margin-top:14px;font-size:11px">ابتدا در پنل Spider کاربر را بسازید</p></div>';
+    document.getElementById('app').innerHTML='<div class="err"><h2>'+(uuid||uname)+'</h2><p>'+e.message+'</p><p style="margin-top:14px;font-size:11px">ابتدا در پنل Spider کاربر را بسازید</p></div>';
   }
 }
 
@@ -240,7 +244,7 @@ async function doPing(){
   btn.disabled=true;btn.textContent='Pinging...';res.textContent='';
   var t0=Date.now();
   try{
-    var r=await fetch('/sub/'+uname+'/ping',{method:'HEAD',cache:'no-store'});
+    var r=await fetch('/sub/'+uuid,{method:'HEAD',cache:'no-store'});
     var ms=Date.now()-t0,cls=ms<150?'f':ms<400?'m':'s',txt=ms<150?'GOOD':ms<400?'OK':'SLOW';
     res.textContent=txt+' '+ms+' ms';res.className='ping-r '+cls;
   }catch(e){

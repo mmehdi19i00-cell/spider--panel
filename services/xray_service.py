@@ -192,62 +192,92 @@ async def install_xray_core(force: bool = False, version: str = XRAY_VERSION) ->
             return True
 
 # ── Reality Key Generation ─────────────────────────────────────────────────
-def _is_x25519_hex(s: str) -> bool:
-    """True if s is exactly a 64-char hex x25519 key."""
+def _looks_like_key(s: str) -> bool:
+    """True if s is a plausible x25519 key.
+
+    Xray 26.x emits base64url keys (~43 chars, e.g.
+    'mJs9OOZeOVaU5DZ4bzjR6KdlRc_nXRv2gWNnviVU43Y'), but older builds or other
+    tooling may emit 64-char hex. Accept either so the parser never fails on a
+    valid key just because the character class differs.
+    """
     s = s.strip()
-    return len(s) == 64 and all(c in "0123456789abcdefABCDEF" for c in s)
+    if not s:
+        return False
+    if len(s) in (43, 64) and all(c in "0123456789abcdefABCDEF" for c in s):
+        return True  # hex
+    # base64url: A-Z a-z 0-9 - _ , length 40-64
+    return (40 <= len(s) <= 64) and all(c in
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_=" for c in s)
 
 
-async def generate_reality_keypair() -> Tuple[str, str]:
+async def generate_reality_keypair() -> Dict[str, str]:
     """Generate a Reality x25519 key pair using the installed Xray binary.
 
-    Runs `xray x25519` and parses PrivateKey/PublicKey from stdout.
-    Never uses Python crypto or random bytes for the keypair.
-    Returns (private_key, public_key).
+    Runs `xray x25519` and parses PrivateKey/PublicKey (and Hash32 if present)
+    from stdout. Never uses Python crypto or random bytes for the keypair.
+
+    Xray 26.x emits (note the `Password (PublicKey):` alias and `Hash32:`):
+        PrivateKey: <base64url private>
+        Password (PublicKey): <base64url public>
+        Hash32: <base64url hash>
+
+    Older builds may emit `Public key:` on its own line, or two-line output.
+    Returns {"private_key", "public_key", "hash32"}.
     """
     if not await is_xray_installed():
         raise RuntimeError("Xray binary not installed; cannot generate Reality keys")
     result = await run_cmd([str(XRAY_BINARY_PATH), "x25519"])
     if result["code"] != 0:
-        raise RuntimeError(f"x25519 generation failed: {result['stderr']}")
+        raise RuntimeError(f"x25519 generation failed: {result['stderr'] or result['stdout']}")
 
     output = result["stdout"]
-    private_key = ""
-    public_key = ""
+    parsed: Dict[str, str] = {"private_key": "", "public_key": "", "hash32": ""}
     pending_label = None  # label seen on a previous line (two-line Xray format)
+
+    def _classify(label: str):
+        l = label.strip().lower().rstrip(":")
+        if "private" in l:
+            return "private"
+        if "public" in l or "password" in l:
+            return "public"
+        if "hash32" in l or "hash" in l:
+            return "hash"
+        return None
+
     for raw in output.splitlines():
         line = raw.strip()
+        if not line:
+            continue
         low = line.lower()
-        # Label-only line, e.g. "Private key:" with the value on the next line.
-        if low in ("privatekey:", "private key:"):
-            pending_label = "private"
-            continue
-        if low in ("publickey:", "public key:"):
-            pending_label = "public"
-            continue
+        # "Label: value" on one line — value may be empty (two-line form).
+        if ":" in line:
+            head, _, tail = line.partition(":")
+            kind = _classify(head)
+            tail = tail.strip()
+            if kind and tail:
+                parsed[kind + "_key" if kind != "hash" else "hash32"] = tail
+                continue
+            if kind and not tail:
+                pending_label = kind
+                continue
         # Bare value line following a label (two-line Xray format).
-        if pending_label and _is_x25519_hex(line):
-            if pending_label == "private":
-                private_key = line
-            else:
-                public_key = line
+        if pending_label and _looks_like_key(line):
+            key = pending_label + "_key" if pending_label != "hash" else "hash32"
+            parsed[key] = line
             pending_label = None
-            continue
-        # "Label: value" on one line.
-        if low.startswith("privatekey:") or low.startswith("private key:"):
-            private_key = line.split(":", 1)[1].strip()
-        elif low.startswith("publickey:") or low.startswith("public key:"):
-            public_key = line.split(":", 1)[1].strip()
 
-    if not private_key or not public_key:
-        # Backstop: any two 64-char hex strings in the output.
+    # Backstop: if something still missing, scan for base64url/hex tokens.
+    if not (parsed["private_key"] and parsed["public_key"]):
         import re
-        hex64 = re.findall(r"[0-9a-fA-F]{64}", output)
-        if len(hex64) >= 2:
-            private_key, public_key = hex64[0], hex64[1]
-    if not private_key or not public_key:
+        tokens = [t for t in re.findall(r"[A-Za-z0-9_\-]{40,64}", output) if _looks_like_key(t)]
+        if parsed["private_key"] and len(tokens) >= 1:
+            parsed["public_key"] = tokens[-1]
+        elif len(tokens) >= 2:
+            parsed["private_key"], parsed["public_key"] = tokens[0], tokens[1]
+
+    if not parsed["private_key"] or not parsed["public_key"]:
         raise RuntimeError(f"Failed to parse x25519 output: {output}")
-    return private_key, public_key
+    return parsed
 
 
 async def generate_reality_keys() -> Tuple[str, str, str]:
@@ -257,7 +287,8 @@ async def generate_reality_keys() -> Tuple[str, str, str]:
     hex string (NOT a keypair, so randomness is acceptable) but it is always
     persisted via ensure_reality_keys — never regenerated on restart.
     """
-    private_key, public_key = await generate_reality_keypair()
+    keys = await generate_reality_keypair()
+    private_key, public_key = keys["private_key"], keys["public_key"]
     short_id = secrets.token_hex(8)  # 16 hex chars (valid Reality shortId)
     return private_key, public_key, short_id
 
@@ -292,9 +323,9 @@ async def ensure_reality_keys(inbound_id: str) -> Dict[str, Any]:
         rs["spiderx"] = rs["spiderX"]
 
     if not rs.get("private_key") or not rs.get("public_key"):
-        private_key, public_key = await generate_reality_keypair()
-        rs["private_key"] = private_key
-        rs["public_key"] = public_key
+        keys = await generate_reality_keypair()
+        rs["private_key"] = keys["private_key"]
+        rs["public_key"] = keys["public_key"]
         if not rs.get("short_ids"):
             rs["short_ids"] = secrets.token_hex(8)
 

@@ -82,6 +82,28 @@ app.include_router(xhttp_router)
 app.include_router(web_router)
 app.include_router(api_router)
 
+# ── Global error handlers (always return JSON, never HTML) ─────────────────
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+@app.exception_handler(StarletteHTTPException)
+async def _json_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    # Only force JSON for API paths; static pages keep their HTML.
+    if request.url.path.startswith("/api/") or request.url.path.startswith("/sub/"):
+        return JSONResponse(status_code=exc.status_code, content={"success": False, "error": str(exc.detail)})
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+@app.exception_handler(RequestValidationError)
+async def _json_validation_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(status_code=422, content={"success": False, "error": "validation error", "detail": exc.errors()})
+
+@app.exception_handler(Exception)
+async def _json_unhandled_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled error on {request.url.path}: {exc}")
+    if request.url.path.startswith("/api/") or request.url.path.startswith("/sub/"):
+        return JSONResponse(status_code=500, content={"success": False, "error": str(exc)})
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+
 # ── HTTP Client ────────────────────────────────────────────────────────────
 http_client: httpx.AsyncClient | None = None
 
