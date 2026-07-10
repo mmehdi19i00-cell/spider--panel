@@ -153,6 +153,16 @@ async def startup():
             logger.critical(f"Failed to prepare Reality inbound '{iid}': {e}")
             raise
 
+    # Start Xray with the generated config (validates + writes + launches).
+    # Without this the inbound is never actually listening, so every link
+    # fails to connect even when the link itself is correct.
+    xray_result = await start_xray()
+    if not xray_result.get("ok"):
+        error_msg = f"Xray failed to start: {xray_result.get('error')}"
+        logger.critical(error_msg)
+        raise RuntimeError(error_msg)
+    logger.info(f"Xray started (pid {xray_result.get('pid')})")
+
     log_activity("system", "سرور راه‌اندازی شد", "ok")
     logger.info(f"Spider Gateway v9.2 started on port {CONFIG['port']}")
 

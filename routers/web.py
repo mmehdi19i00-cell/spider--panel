@@ -8,6 +8,7 @@ Only the API endpoints that the static frontend depends on live here.
 import asyncio
 import hashlib
 import secrets
+from datetime import datetime
 
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse, Response, JSONResponse
@@ -139,20 +140,61 @@ async def user_config(user_id: str, request: Request):
 
 @router.get("/api/sub/{username}")
 async def user_subscription(username: str, request: Request):
+    """Per-user subscription data consumed by static/sub.html.
+
+    Returns the exact shape the viewer expects:
+      config (first VLESS link), traffic_used_bytes, traffic_limit_bytes,
+      expire_days, username, protocol, status, concurrent_connections.
+    """
     # Resolve username -> user_id
     async with USERS_LOCK:
         user_id = None
+        user = None
         for uid, u in USERS.items():
             if u.get("username") == username:
                 user_id = uid
+                user = u
                 break
-    if not user_id:
+    if not user_id or user is None:
         return JSONResponse({"success": False, "error": "user not found"}, status_code=404)
+
+    # Build the real VLESS config(s) for this user (Reality-aware).
     payload = await _user_config_payload(user_id)
-    status = 404 if (not payload.get("success") and payload.get("error") == "user not found") else 200
-    if not payload.get("success"):
-        status = payload.get("status_code", 400)
-    return JSONResponse(payload, status_code=status)
+    configs = payload.get("configs", []) if payload.get("success") else []
+    first_link = configs[0]["link"] if configs else ""
+    if not payload.get("success") and payload.get("error"):
+        # Reality-incomplete etc. — still return the user record so the page
+        # can show the error context, but no config.
+        return JSONResponse({
+            "success": False,
+            "error": payload.get("error"),
+            "missing": payload.get("missing"),
+            "username": user.get("username", username),
+        }, status_code=400)
+
+    used = user.get("traffic_used_bytes", 0)
+    limit = user.get("traffic_limit_bytes", 0)
+    expire_at = user.get("expire_at")
+    expire_days = None
+    if expire_at:
+        try:
+            expire_days = max(0, (datetime.fromisoformat(expire_at) - datetime.now()).days)
+        except Exception:
+            expire_days = None
+
+    return JSONResponse({
+        "success": True,
+        "config": first_link,            # sub.html reads d.config
+        "vless_link": first_link,
+        "configs": configs,
+        "username": user.get("username", username),
+        "protocol": (user.get("inbound_id") and INBOUNDS.get(user["inbound_id"], {}).get("protocol")) or "vless",
+        "status": user.get("status", "active"),
+        "concurrent_connections": user.get("concurrent_connections", 2),
+        "traffic_used_bytes": used,
+        "traffic_limit_bytes": limit,
+        "expire_days": expire_days,
+    })
 
 
 # ── Login / Logout / Session API ─────────────────────────────────────────────

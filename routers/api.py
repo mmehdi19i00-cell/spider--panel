@@ -395,6 +395,19 @@ async def tools_settings(body: SettingsReq):
     return {"success": True, "domain": SETTINGS.get("domain")}
 
 
+@router.get("/api/tools/xray-status")
+async def tools_xray_status():
+    """Report Xray binary install/version so the panel can show it in Settings."""
+    installed = await is_xray_installed()
+    version = await get_xray_version() if installed else None
+    return {
+        "installed": installed,
+        "version": version,
+        "path": str(XRAY_BINARY_PATH),
+        "valid": bool(version),
+    }
+
+
 @router.post("/api/tools/generate-reality-keys")
 async def tools_generate_reality_keys():
     try:

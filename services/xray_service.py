@@ -18,7 +18,7 @@ from config import (
     XRAY_BINARY_PATH, XRAY_CONFIG_PATH, XRAY_ASSETS_DIR, XRAY_LOG_DIR,
     hash_password,
 )
-from core.state import generate_uuid, INBOUNDS, INBOUNDS_LOCK, save_state
+from core.state import generate_uuid, INBOUNDS, INBOUNDS_LOCK, save_state, USERS
 import aiofiles
 
 logger = logging.getLogger("xray_service")
@@ -210,11 +210,20 @@ async def generate_reality_keypair() -> Tuple[str, str]:
     public_key = ""
     for line in output.splitlines():
         line = line.strip()
-        if line.startswith("PrivateKey:"):
+        low = line.lower()
+        # Xray prints "PrivateKey:" / "PublicKey:" but casing/spacing varies by
+        # version (e.g. "Private key:"). Match case-insensitively on the key name.
+        if low.startswith("privatekey:") or low.startswith("private key:"):
             private_key = line.split(":", 1)[1].strip()
-        elif line.startswith("PublicKey:"):
+        elif low.startswith("publickey:") or low.startswith("public key:"):
             public_key = line.split(":", 1)[1].strip()
 
+    if not private_key or not public_key:
+        # Last resort: regex for 64-hex x25519 keys anywhere in output.
+        import re
+        hex64 = re.findall(r"\b[0-9a-fA-F]{64}\b", output)
+        if len(hex64) >= 2:
+            private_key, public_key = hex64[0], hex64[1]
     if not private_key or not public_key:
         raise RuntimeError(f"Failed to parse x25519 output: {output}")
     return private_key, public_key
@@ -465,9 +474,30 @@ def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
     }
     
     if protocol in ("vless", "vmess", "trojan"):
-        client_count = 10
+        # Clients MUST be the real users' config_uuid — the exact UUID that
+        # generate_vless_link() puts into the subscription link. Generating
+        # random UUIDs here would make every link connect to a non-existent
+        # client (the "fake uuid / config not working" bug).
         clients = []
-        for i in range(client_count):
+        seen = set()
+        for u in USERS.values():
+            if u.get("inbound_id") != iid:
+                continue
+            uid = u.get("config_uuid") or u.get("user_id")
+            if not uid or uid in seen:
+                continue
+            seen.add(uid)
+            client = {"id": uid}
+            if protocol == "vless":
+                client["flow"] = ""
+            elif protocol == "vmess":
+                client["alterId"] = 0
+            elif protocol == "trojan":
+                client["password"] = u.get("config_uuid") or secrets.token_urlsafe(16)
+            clients.append(client)
+        # Fallback: if no users are linked yet, still emit one valid client so
+        # the inbound can start and a manually-created link works.
+        if not clients:
             uid = generate_uuid()
             client = {"id": uid}
             if protocol == "vless":
