@@ -490,9 +490,9 @@ def generate_vless_link(
         # external_domain only if no active domain is configured.
         params["host"] = host if (host == get_active_domain() or not inbound.get("external_domain")) else (inbound.get("external_domain") or host)
         # ws path must EXACTLY match the server-side wsSettings.path.
-        # Per-user dedicated path: /ws/{user config_uuid} (standard UUID).
-        # If an explicit path is configured on the inbound it is honored.
-        params["path"] = ws.get("path") or f"/ws/{uuid}"
+        # Shared per-inbound path /ws/{inbound id}; Xray authenticates the user
+        # by the VLESS client uuid, so a single path serves all users.
+        params["path"] = ws.get("path") or f"/ws/{inbound_id or iid}"
         params["alpn"] = "http/1.1"
     elif network == "xhttp":
         xh = inbound.get("xhttp_settings", {})
@@ -551,17 +551,15 @@ def generate_xray_server_config(inbound_id: Optional[str] = None) -> Dict[str, A
 def _ws_path_for_inbound(iid: str, ws_settings: dict) -> str:
     """ws path that EXACTLY matches the client link.
 
-    Per-user dedicated path: /ws/{config_uuid} of the first user linked to
-    this inbound. Falls back to /ws/{inbound id} when no user is linked yet.
+    The path is shared per-inbound (/ws/{inbound id}). Xray authenticates the
+    user via the VLESS client uuid inside the frame, NOT via the path, so a
+    single shared inbound path works for every user and — critically — always
+    matches the generated subscription link. A per-user path here would only
+    match the FIRST linked user's link and silently break everyone else.
     """
     if ws_settings.get("path"):
         return ws_settings["path"]
-    cuuid = None
-    for u in USERS.values():
-        if u.get("inbound_id") == iid and u.get("config_uuid"):
-            cuuid = u["config_uuid"]
-            break
-    return f"/ws/{cuuid}" if cuuid else f"/ws/{iid}"
+    return f"/ws/{iid}"
 
 
 def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
@@ -634,7 +632,7 @@ def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
         short_ids_raw = rs.get("short_ids")
         short_ids_list = short_ids_raw if isinstance(short_ids_raw, list) else [short_ids_raw]
         inbound_obj["streamSettings"] = {
-            "network": network if network in ("tcp", "xhttp", "grpc") else "tcp",
+            "network": network if network in ("tcp", "xhttp", "grpc", "ws") else "tcp",
             "security": "reality",
             "realitySettings": {
                 "show": False,

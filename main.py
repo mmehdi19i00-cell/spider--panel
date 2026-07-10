@@ -268,60 +268,37 @@ async def require_auth(request: Request):
 # the Xray internal listener for that user's inbound. Unknown uuid -> 1008
 # (NOT an HTTP 403). No auth middleware / cookie is required here.
 import socket as _socket
+import websockets
 
-async def _bridge_ws_to_xray(websocket: "WebSocket", target_host: str, target_port: int):
-    """Relay raw bytes between the accepted WebSocket and Xray's TCP listener."""
-    # Open the upstream TCP connection to Xray (blocking -> thread).
-    loop = asyncio.get_event_loop()
+async def _bridge_ws_to_xray(websocket: "WebSocket", target_host: str, target_port: int, path: str):
+    """Relay frames between the client WebSocket and Xray's internal listener.
+
+    Xray's internal `network: ws` inbound is itself a *WebSocket server* — it
+    expects its own WS upgrade on the socket. FastAPI has already consumed the
+    client's handshake, so we must open a fresh WebSocket *client* connection
+    to Xray (ws://127.0.0.1:{port}{path}) and relay the decoded frame payloads
+    in both directions. A raw TCP pipe would hand Xray unframed VLESS bytes and
+    the connection would fail to establish.
+    """
+    uri = f"ws://{target_host}:{target_port}{path}"
     try:
-        rsock = await loop.run_in_executor(None, lambda: _socket.create_connection((target_host, target_port), timeout=10))
-    except OSError as e:
-        logger.warning(f"WS tunnel: cannot connect to Xray at {target_host}:{target_port}: {e}")
-        return
-    rsock.setblocking(False)
-    try:
-        # Seed Xray with the original WS HTTP request bytes so it sees a valid
-        # WebSocket upgrade (Xray's built-in WS server expects the raw client
-        # handshake). We already accepted, so reconstruct minimally is not
-        # possible; instead rely on Xray's wsSettings path match + the client
-        # sending frames directly. Relay frames as they arrive.
-        client_q = asyncio.Queue()
-        async def _from_client():
-            try:
-                while True:
-                    data = await websocket.receive_bytes()
-                    await client_q.put(("c", data))
-            except WebSocketDisconnect:
-                await client_q.put(("x", b""))
-        async def _from_xray():
-            while True:
+        async with websockets.connect(uri, max_size=None, ping_interval=None, ping_timeout=None) as xray_ws:
+            async def _from_client():
                 try:
-                    data = await loop.run_in_executor(None, rsock.recv, 65536)
-                except (BlockingIOError, OSError):
-                    await asyncio.sleep(0.01)
-                    continue
-                if not data:
-                    break
-                await client_q.put(("x", data))
-        async def _pump():
-            while True:
-                src, data = await client_q.get()
-                if src == "x" and not data:
-                    break
-                if src == "c":
-                    try:
-                        await loop.run_in_executor(None, rsock.sendall, data)
-                    except OSError:
-                        break
-                else:
-                    try:
+                    while True:
+                        data = await websocket.receive_bytes()
+                        await xray_ws.send(data)
+                except (WebSocketDisconnect, Exception):
+                    pass
+            async def _from_xray():
+                try:
+                    async for data in xray_ws:
                         await websocket.send_bytes(data)
-                    except Exception:
-                        break
-        tasks = [asyncio.create_task(_from_client()), asyncio.create_task(_from_xray()), asyncio.create_task(_pump())]
-        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-    finally:
-        rsock.close()
+                except Exception:
+                    pass
+            await asyncio.gather(_from_client(), _from_xray(), return_exceptions=True)
+    except Exception as e:
+        logger.warning(f"WS tunnel: Xray WS connect failed {uri}: {e}")
 
 
 @app.websocket("/ws/{uuid}")
@@ -370,7 +347,10 @@ async def ws_tunnel(websocket: WebSocket, uuid: str):
     await websocket.accept()  # 101 Switching Protocols
     logger.info("WS tunnel accepted: user=%s ip=%s -> 127.0.0.1:%s", cuuid, client_ip_addr, target_port)
     try:
-        await _bridge_ws_to_xray(websocket, "127.0.0.1", target_port)
+        # The inbound's internal WS path MUST match the client link's path,
+        # otherwise Xray's wsSettings path check rejects the upgrade.
+        ws_path = _ws_path_for_inbound(iid, ib.get("ws_settings", {}))
+        await _bridge_ws_to_xray(websocket, "127.0.0.1", target_port, ws_path)
     except Exception as e:
         logger.error("WS tunnel error for %s: %s", cuuid, e)
     finally:
