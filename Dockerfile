@@ -50,9 +50,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY scripts ./scripts
 
-# Data volume (sqlite + generated config live here)
+# Data path (sqlite + generated xray config live here).
+# On Railway, attach a Volume and mount it at /app/data (set DATA_DIR=/app/data).
+# Railway does NOT support the VOLUME instruction in Dockerfiles — configure the
+# volume in the Railway dashboard instead.
 RUN mkdir -p /app/data/xray
-VOLUME ["/app/data"]
 
 # Never bind a hardcoded port: uvicorn listens on $PORT (Railway injects it)
 EXPOSE 8000

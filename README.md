@@ -82,20 +82,25 @@ tests/test_spider_panel.py  # full test suite
 1. **Create a new Railway project** and link this repo (or use `railway link`).
 2. Railway auto-detects the `Dockerfile` and builds it. The multi-stage
    build downloads the **latest official Xray-core** at build time.
-3. **Add a TCP Proxy** service for the VLESS port (default `443`). Railway
+3. **Add a Volume** in the Railway dashboard and mount it at `/app/data`
+   (the app stores SQLite + the generated `xray/config.json` there). Railway
+   does **not** support the `VOLUME` instruction in Dockerfiles, so the
+   volume is configured in the dashboard, not in the image.
+4. **Add a TCP Proxy** service for the VLESS port (default `443`). Railway
    injects `RAILWAY_TCP_PROXY_DOMAIN` and `RAILWAY_TCP_PROXY_PORT`, which the
    app reads automatically to build public subscription links. The **web**
    dashboard is served on `PORT` (Railway's HTTP service).
-4. **Set environment variables** in the Railway dashboard:
+5. **Set environment variables** in the Railway dashboard:
    | Variable | Required | Notes |
    |----------|----------|-------|
    | `ADMIN_PASSWORD` | ✅ | Strong password for first admin |
    | `SECRET_KEY` | ✅ | `python -c "import secrets;print(secrets.token_urlsafe(48))"` |
    | `ADMIN_USERNAME` | ⬜ | default `admin` |
    | `XRAY_PORT` | ⬜ | default `443` |
+   | `DATA_DIR` | ⬜ | set to `/app/data` (the mounted volume) |
    | `DATABASE_URL` | ⬜ | default SQLite; use Postgres in prod |
    | `RAILWAY_TCP_PROXY_DOMAIN/PORT` | auto | injected by Railway TCP proxy |
-5. **Deploy.** On first boot the app:
+6. **Deploy.** On first boot the app:
    - creates tables,
    - creates the admin account (if none exists),
    - creates a default **VLESS Reality + XHTTP** inbound on `XRAY_PORT`,
