@@ -537,7 +537,6 @@ def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
         if network == "xhttp":
             inbound_obj["streamSettings"]["xhttpSettings"] = {
                 "path": xh_settings.get("path", "/"),
-                "host": xh_settings.get("host", domain),
                 "mode": xh_settings.get("mode", "auto"),
                 "xPaddingBytes": xh_settings.get("xPaddingBytes", "100-1000"),
                 "scMaxEachPostBytes": xh_settings.get("scMaxEachPostBytes", "1000000"),
@@ -545,16 +544,20 @@ def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
                 "scStreamUpServerSecs": xh_settings.get("scStreamUpServerSecs", "20-80"),
             }
     elif security == "tls":
-        inbound_obj["streamSettings"] = {
+        stream = {
             "network": network,
             "security": "tls",
-            "tlsSettings": {
-                "certificates": [{
-                    "certificateFile": "/etc/xray/cert.pem",
-                    "keyFile": "/etc/xray/key.pem"
-                }]
-            }
         }
+        # Only reference certificate files if they actually exist. Xray auto-
+        # generates a self-signed cert at runtime when tlsSettings is omitted,
+        # so hardcoding /etc/xray/cert.pem (which doesn't exist on Railway)
+        # makes the config invalid and Xray refuses to start.
+        tls_settings = ib.get("tls_settings") or {}
+        cert_file = tls_settings.get("certificateFile")
+        key_file = tls_settings.get("keyFile")
+        if cert_file and key_file and Path(cert_file).exists() and Path(key_file).exists():
+            stream["tlsSettings"] = {"certificates": [{"certificateFile": cert_file, "keyFile": key_file}]}
+        inbound_obj["streamSettings"] = stream
         if network == "ws":
             inbound_obj["streamSettings"]["wsSettings"] = {
                 "path": ws_settings.get("path", "/"),
@@ -567,7 +570,6 @@ def _add_inbound_to_xray(cfg: Dict, ib: Dict, iid: str, host: str):
         elif network == "xhttp":
             inbound_obj["streamSettings"]["xhttpSettings"] = {
                 "path": xh_settings.get("path", "/"),
-                "host": xh_settings.get("host", domain),
                 "mode": xh_settings.get("mode", "auto"),
                 "xPaddingBytes": xh_settings.get("xPaddingBytes", "100-1000"),
                 "scMaxEachPostBytes": xh_settings.get("scMaxEachPostBytes", "1000000"),
@@ -594,8 +596,10 @@ async def validate_xray_config(config: Dict[str, Any]) -> Tuple[bool, str]:
         tmp_path = f.name
     
     try:
+        # Xray prints validation errors to STDOUT (not stderr), so include both.
         result = await run_cmd([str(XRAY_BINARY_PATH), "-test", "-config", tmp_path])
-        return result["code"] == 0, result["stderr"]
+        detail = (result["stderr"] or result["stdout"]).strip() or "unknown validation error"
+        return result["code"] == 0, detail
     finally:
         try:
             os.unlink(tmp_path)
@@ -632,6 +636,15 @@ async def start_xray(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         
         valid, error = await validate_xray_config(config)
         if not valid:
+            # Write the bad config to disk so it can be inspected manually:
+            #   cat /app/xray-config/config.json
+            #   /app/xray-core/xray -test -config /app/xray-config/config.json
+            try:
+                await write_xray_config(config)
+                logger.critical(f"Xray config validation FAILED. Config written to {XRAY_CONFIG_PATH} for inspection.")
+            except Exception:
+                pass
+            logger.critical(f"Xray config validation FAILED:\n{error}")
             return {"ok": False, "error": f"Invalid config: {error}"}
         
         if not await write_xray_config(config):
