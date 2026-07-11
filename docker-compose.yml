@@ -16,7 +16,7 @@ services:
       # --- Auth / secrets (CHANGE THESE) ---
       SECRET_KEY: "${SECRET_KEY:-please-change-this-secret}"
       ADMIN_USERNAME: "${ADMIN_USERNAME:-admin}"
-      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-changeme123}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-admin}"
       # --- Database: sqlite by default; set DATABASE_URL for postgres ---
       DATABASE_URL: "${DATABASE_URL:-sqlite+aiosqlite:///./spider.db}"
       # --- Xray ---

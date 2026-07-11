@@ -92,6 +92,15 @@ async def index():
     return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
 
 
+@app.get("/sub")
+async def sub_landing():
+    """Public subscription UI landing page (enter a UUID, or open /sub/<uuid>)."""
+    sub_html = os.path.join(_STATIC_DIR, "sub.html")
+    if os.path.isfile(sub_html):
+        return FileResponse(sub_html)
+    return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
+
+
 @app.get("/{full_path:path}")
 async def spa_fallback(full_path: str):
     # Don't hijack /api or /sub

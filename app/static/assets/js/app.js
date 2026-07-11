@@ -512,6 +512,19 @@
         <p class="muted" style="font-size:12px;margin-top:10px">
           No audio files found in <code>/musics</code>. Drop <code>.mp3</code>/<code>.wav</code> files there (or run the bundled generator) to enable this feature.
         </p>`}
+      </div>
+
+      <div class="panel glass" style="margin-top:16px">
+        <h3>ADMIN CREDENTIALS</h3>
+        <p class="muted" style="font-size:12px">Change the panel login username / password. Required on first run (default <code>admin</code> / <code>admin</code>).</p>
+        <form id="cred-f" class="field-row">
+          <div class="field"><label>Current password</label><input name="current_password" type="password" required></div>
+          <div class="field"><label>New username (blank=keep)</label><input name="new_username" placeholder="admin"></div>
+          <div class="field"><label>New password (blank=keep)</label><input name="new_password" type="password"></div>
+        </form>
+        <div class="row-actions" style="margin-top:12px">
+          <button class="btn btn-primary neon btn-sm" id="save-cred">Update credentials</button>
+        </div>
       </div>`;
 
     const toggle = root.querySelector("#set-music");
@@ -525,6 +538,20 @@
 
     const preview = root.querySelector("#preview-music");
     if (preview) preview.onclick = () => playRandomMusic(files, root.querySelector("#now-playing"));
+
+    root.querySelector("#save-cred").onclick = async () => {
+      const f = Object.fromEntries(new FormData(root.querySelector("#cred-f")).entries());
+      if (!f.current_password) { toast("Enter current password", "err"); return; }
+      const payload = { current_password: f.current_password };
+      if (f.new_username) payload.new_username = f.new_username;
+      if (f.new_password) payload.new_password = f.new_password;
+      if (!f.new_username && !f.new_password) { toast("Nothing to change", "err"); return; }
+      try {
+        await api("/auth/change-credentials", { method: "POST", body: payload });
+        toast("Credentials updated");
+        root.querySelector("#cred-f").reset();
+      } catch (e) { toast(e.message, "err"); }
+    };
   }
 
   let _musicAudio = null;
@@ -574,7 +601,7 @@
   }
 
   /* ---------------- app entry ---------------- */
-  async function enterApp() {
+  async function enterApp(initial) {
     $("#login-view").hidden = true;
     $("#app-view").hidden = false;
     $("#me-name").textContent = ME;
@@ -585,7 +612,7 @@
         ? `<span id="xray-status" class="pill on">Xray: RUNNING</span>`
         : `<span id="xray-status" class="pill off">Xray: STOPPED</span>`;
     } catch { /* ignore */ }
-    showView("dashboard");
+    showView(initial && views[initial] ? initial : "dashboard");
     maybePlayMusicOnOpen();
   }
 
@@ -612,8 +639,21 @@
   // boot
   bindShell();
   spawnParticles();
+
+  function initialView() {
+    const seg = (location.pathname || "/").replace(/^\/+|\/+$/g, "").split("/")[0];
+    const map = {
+      login: "login", dashboard: "dashboard", users: "users", inbounds: "inbounds",
+      domains: "domains", subscription: "subscription", system: "system", settings: "settings",
+    };
+    return map[seg] || "dashboard";
+  }
+
   if (TOKEN) {
-    // verify token still valid
-    api("/auth/me").then(() => enterApp()).catch(() => logout());
+    // verify token still valid, then open the view implied by the URL
+    api("/auth/me").then(() => enterApp(initialView())).catch(() => logout());
+  } else {
+    // no token -> always show login (login view handles its own path)
+    if (initialView() === "login") { /* login already shown */ }
   }
 })();

@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     # --- First-run admin ---
     ADMIN_USERNAME: str = "admin"
-    ADMIN_PASSWORD: str = ""
+    ADMIN_PASSWORD: str = "admin"
     ADMIN_EMAIL: str = ""
 
     # --- Xray core ---
@@ -134,6 +134,9 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # Ensure a default admin password exists for first run (dev convenience).
+# Default is "admin" (set above); only generate a random one if it was
+# explicitly emptied via env and no override is provided. Real deployments
+# MUST set ADMIN_PASSWORD (and should change it via Settings after login).
 if not settings.ADMIN_PASSWORD:
     # Persist a generated one to the process; real deployments MUST set ADMIN_PASSWORD.
     settings.ADMIN_PASSWORD = secrets.token_urlsafe(16)
