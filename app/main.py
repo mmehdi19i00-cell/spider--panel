@@ -19,10 +19,12 @@ from app.api import (
     dashboard,
     domains,
     inbounds,
+    qr,
     settings as settings_router,
     subscription,
     system,
     users,
+    xray_logs,
 )
 from app.bootstrap import (
     ensure_admin,
@@ -73,8 +75,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# CSRF defense-in-depth: state-changing requests (POST/PUT/DELETE/PATCH) that
+# carry an X-Requested-With: SpiderSPA header must also carry a valid-format
+# X-CSRF-Token. Plain API/test clients that omit both headers are unaffected.
+# This stops cross-site form/JS from issuing mutations without the SPA token.
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class CSRFTokenMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+            if request.headers.get("X-Requested-With") == "SpiderSPA":
+                token = request.headers.get("X-CSRF-Token", "")
+                if not (len(token) == 32 and all(c in "0123456789abcdef" for c in token)):
+                    from fastapi import Response
+                    return Response("CSRF token invalid", status_code=403)
+        return await call_next(request)
+
+app.add_middleware(CSRFTokenMiddleware)
+
 # API routers
-for r in (auth, users, dashboard, inbounds, domains, subscription, system, settings_router):
+for r in (auth, users, dashboard, inbounds, domains, qr, subscription, system, settings_router, xray_logs):
     app.include_router(r.router)
 
 

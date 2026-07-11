@@ -42,8 +42,11 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = ""
 
     # --- Xray core ---
-    XRAY_BINARY_PATH: str = "/usr/local/bin/xray"
-    XRAY_PORT: int = 443
+    # XRAY_PORT = the INTERNAL port the container binds (NEVER 443 inside
+    # Railway — Railway proxies TCP to a private PORT). Defaults to the
+    # Railway-injected PORT when present, else a safe high port.
+    XRAY_BINARY_PATH: str = "/app/xray-core/xray"
+    XRAY_PORT: int = 0  # 0 -> auto-detect (Railway PORT or 8443 fallback)
     XRAY_API_PORT: int = 10085  # internal stats/control API (loopback only)
     XRAY_CONFIG_PATH: str = ""  # defaults to <DATA_DIR>/xray/config.json
 
@@ -110,13 +113,33 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def public_port(self) -> int:
-        """Port used in client (subscription) links."""
+        """Port used in client (subscription) links — the externally
+        reachable Railway TCP proxy port, falling back to XRAY_PORT."""
         if self.RAILWAY_TCP_PROXY_PORT:
             try:
                 return int(self.RAILWAY_TCP_PROXY_PORT)
             except ValueError:
                 pass
-        return self.XRAY_PORT
+        return self.internal_xray_port
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def internal_xray_port(self) -> int:
+        """Port Xray actually binds INSIDE the container.
+
+        Railway injects PORT (the web port) — Xray must NOT use that. So we
+        pick a distinct internal port: explicit XRAY_PORT if set (>0), else
+        fall back to a safe high port (8443). Never 443 (privileged + Railway
+        proxy owns the public edge).
+        """
+        if self.XRAY_PORT and self.XRAY_PORT > 0:
+            return self.XRAY_PORT
+        return 8443
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def is_railway(self) -> bool:
+        return bool(self.RAILWAY_ENVIRONMENT or self.RAILWAY_TCP_PROXY_DOMAIN)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

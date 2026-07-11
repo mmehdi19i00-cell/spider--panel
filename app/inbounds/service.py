@@ -36,6 +36,7 @@ async def create_inbound(
     network: str = "xhttp",
     server_name: str = "",
     spider_x: str = "/",
+    domain: str = "",
     transport_path: str = "/",
     ws_host: str = "",
     xhttp_mode: str = "auto",
@@ -72,6 +73,7 @@ async def create_inbound(
         short_id=short_id,
         server_name=server_name,
         spider_x=spider_x,
+        domain=domain,
         cert_path=cert_path,
         key_path=key_path,
         alpn=alpn,
@@ -104,7 +106,7 @@ async def update_inbound(db: AsyncSession, ib: Inbound, **fields: Any) -> Inboun
         ib.public_key = pub
         ib.short_id = security_generate_short_id()
     allowed = {
-        "name", "port", "external_port", "security", "network", "server_name", "spider_x",
+        "name", "port", "external_port", "domain", "security", "network", "server_name", "spider_x",
         "cert_path", "key_path", "alpn", "transport_path", "ws_host",
         "xhttp_mode", "xhttp_x_padding_bytes", "xhttp_sc_max_each_post_bytes",
         "xhttp_sc_max_concurrent_posts", "xhttp_extra", "enabled", "uuid",

@@ -100,6 +100,7 @@
         ["Time left", `<span class="${tl.days < 0 ? "bad" : "ok"}">${esc(tl.text)}</span>`],
         ["Expires", fmtDate(d.expire_at)],
         ["Traffic", `${fmtBytes(used)} / ${limit ? fmtBytes(limit) : "∞"}`],
+        ["IP Limit", d.ip_limit ? String(d.ip_limit) : "∞"],
       ].map(([k, v]) => `<div class="card glass"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
 
       let boxes = d.uris.map((uri, i) => {
@@ -139,11 +140,24 @@
         </div>
 
         <div class="panel glass" style="margin-top:16px">
+          <div class="row-between"><h3>QR CODE</h3>
+            <button class="btn btn-sm" data-copy="${esc(location.origin + "/sub/" + d.uuid)}">⧉ Copy Sub</button>
+          </div>
+          <div class="qr-wrap" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:8px">
+            ${d.uris.map((uri, i) => `<img class="qr" src="/api/qr/${esc(d.uuid)}/raw?index=${i}" alt="qr ${i+1}" style="width:160px;height:160px;background:#fff;border-radius:12px" />`).join("")}
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label>Subscription URL</label>
+            <input class="codebox" readonly value="${esc(location.origin + "/sub/" + d.uuid)}" />
+          </div>
+        </div>
+
+        <div class="panel glass" style="margin-top:16px">
           <h3>HOW TO CONNECT</h3>
           <ol class="steps">
             <li>Install a VLESS client (v2rayNG / Shadowrocket / NekoBox / Streisand).</li>
-            <li>Tap <b>Copy</b> on a config above (or <b>Copy all</b> for the full subscription).</li>
-            <li>Import via "Import from clipboard / URI" — Reality needs the <code>sni</code>, <code>pbk</code> and <code>sid</code> shown in details.</li>
+            <li>Scan a <b>QR code</b> above, or tap <b>Copy</b> on a config (or <b>Copy Sub</b> for the whole subscription).</li>
+            <li>Import via "Import from clipboard / URI / QR" — Reality needs the <code>sni</code>, <code>pbk</code> and <code>sid</code> shown in details.</li>
             <li>Enable the profile and connect. Green ping above means the server answers.</li>
           </ol>
         </div>`;

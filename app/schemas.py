@@ -94,10 +94,11 @@ class InboundCreate(BaseModel):
     tag: str = Field(min_length=1, max_length=64)
     name: str = ""
     port: int = Field(ge=1, le=65535)
+    domain: str = ""  # per-inbound domain (used for SNI + subscription host); blank=active domain
     external_port: int | None = None  # client-facing port (differs from `port` behind NAT/proxy)
     security: str = "reality"  # reality | tls | none
     network: str = "xhttp"  # xhttp | ws
-    server_name: str = ""
+    server_name: str = ""  # Reality SNI shown to clients (default is1-ssl.mzstatic.com)
     spider_x: str = "/"
     transport_path: str = "/"
     ws_host: str = ""
@@ -115,6 +116,7 @@ class InboundCreate(BaseModel):
 class InboundUpdate(BaseModel):
     name: str | None = None
     port: int | None = Field(default=None, ge=1, le=65535)
+    domain: str | None = None
     external_port: int | None = Field(default=None, ge=1, le=65535)
     security: str | None = None
     network: str | None = None
@@ -146,6 +148,7 @@ class InboundOut(BaseModel):
     name: str
     protocol: str
     port: int
+    domain: str = ""
     external_port: int | None = None
     security: str
     network: str

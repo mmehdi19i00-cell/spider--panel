@@ -26,6 +26,18 @@ def _sys_metrics() -> tuple[float | None, float | None]:
         return None, None
 
 
+def _storage_stats() -> dict:
+    try:
+        import shutil
+
+        from app.core.config import settings
+
+        total, used, free = shutil.disk_usage(settings.data_dir)
+        return {"total_bytes": total, "used_bytes": used, "free_bytes": free}
+    except Exception:
+        return {"total_bytes": 0, "used_bytes": 0, "free_bytes": 0}
+
+
 @router.get("/stats", response_model=DashboardStats)
 async def stats(_: AdminUser = Depends(get_current_admin), db: AsyncSession = Depends(get_db)):
     us = await service.user_stats(db)
@@ -35,6 +47,9 @@ async def stats(_: AdminUser = Depends(get_current_admin), db: AsyncSession = De
     )
     health = await manager.health_check()
     cpu, mem = _sys_metrics()
+    # storage: data dir size
+    storage = _storage_stats()
+    last = manager.last_result()
     return DashboardStats(
         total_users=us["total"],
         active_users=us["active"],
@@ -47,5 +62,12 @@ async def stats(_: AdminUser = Depends(get_current_admin), db: AsyncSession = De
         memory_percent=mem,
         total_traffic_bytes=int(total_traffic or 0),
         server_time=datetime.now(timezone.utc),
-        extra={"binary": health.get("binary"), "config": health.get("config")},
+        extra={
+            "binary": health.get("binary"),
+            "version": health.get("version"),
+            "config": health.get("config"),
+            "auto_restart": health.get("auto_restart"),
+            "last_error": last.get("error"),
+            "storage": storage,
+        },
     )

@@ -15,6 +15,9 @@ bcrypt>=4.1.0,<5
 python-jose[cryptography]>=3.3.0,<4
 cryptography>=42.0.0,<44
 
+# --- QR code generation (SVG, no native deps) ---
+qrcode>=7.4.2,<8
+
 # --- System metrics (optional, graceful fallback) ---
 psutil>=5.9.0,<7
 

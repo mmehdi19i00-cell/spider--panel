@@ -8,13 +8,21 @@
   let TOKEN = localStorage.getItem("spider_token") || "";
   let ME = localStorage.getItem("spider_user") || "";
 
+  // CSRF: a per-session random token sent on state-changing requests.
+  function csrfToken() {
+    let t = localStorage.getItem("spider_csrf");
+    if (!t) { t = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, "0")).join(""); localStorage.setItem("spider_csrf", t); }
+    return t;
+  }
+
   /* ---------------- helpers ---------------- */
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
   async function api(path, opts = {}) {
-    const headers = { "Content-Type": "application/json" };
+    const headers = { "Content-Type": "application/json", "X-Requested-With": "SpiderSPA" };
     if (TOKEN) headers["Authorization"] = "Bearer " + TOKEN;
+    if (opts.method && opts.method !== "GET") headers["X-CSRF-Token"] = csrfToken();
     let body;
     if (opts.form) {
       // urlencoded for token endpoint
@@ -99,13 +107,13 @@
     users: renderUsers,
     inbounds: renderInbounds,
     domains: renderDomains,
-    subscription: renderSubscription,
     system: renderSystem,
+    logs: renderLogs,
     settings: renderSettings,
   };
   const titles = {
     dashboard: "Dashboard", users: "Users", inbounds: "Inbounds",
-    domains: "Domains", subscription: "Subscriptions", system: "System", settings: "Settings",
+    domains: "Domains", system: "System", logs: "Xray Logs", settings: "Settings",
   };
 
   async function showView(name) {
@@ -124,6 +132,8 @@
   /* ---- Dashboard ---- */
   async function renderDashboard(root) {
     const s = await api("/dashboard/stats");
+    const st = s.extra || {};
+    const storage = st.storage || {};
     const cards = [
       ["Total Users", s.total_users, `${s.active_users} active`],
       ["Active", s.active_users, "online allowed"],
@@ -131,6 +141,9 @@
       ["Disabled", s.disabled_users, "manually off"],
       ["Online Conns", s.online_connections, "live sessions"],
       ["Traffic", fmtBytes(s.total_traffic_bytes), "sum used"],
+      ["CPU", s.cpu_percent == null ? "—" : s.cpu_percent + "%", "load"],
+      ["RAM", s.memory_percent == null ? "—" : s.memory_percent + "%", "used"],
+      ["Storage", storage.total_bytes ? fmtBytes(storage.used_bytes) + " / " + fmtBytes(storage.total_bytes) : "—", storage.free_bytes ? fmtBytes(storage.free_bytes) + " free" : ""],
     ];
     const xray = s.xray_running
       ? `<span class="pill on">Xray: RUNNING</span>`
@@ -151,17 +164,31 @@
         <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
           <div><div class="k">Xray</div><div class="v" style="font-size:20px">${s.xray_running ? "🟢 Up" : "🔴 Down"}</div></div>
           <div><div class="k">PID</div><div class="v" style="font-size:20px">${s.xray_pid ?? "—"}</div></div>
-          <div><div class="k">CPU</div><div class="v" style="font-size:20px">${s.cpu_percent == null ? "—" : s.cpu_percent + "%"}</div></div>
-          <div><div class="k">RAM</div><div class="v" style="font-size:20px">${s.memory_percent == null ? "—" : s.memory_percent + "%"}</div></div>
+          <div><div class="k">Auto-restart</div><div class="v" style="font-size:20px">${st.auto_restart ? "🟢 On" : "—"}</div></div>
+          <div><div class="k">Last error</div><div class="v" style="font-size:13px;color:${st.last_error ? "var(--neon)" : "inherit"}">${st.last_error ? "see Logs" : "none"}</div></div>
         </div>
         <div class="row-actions" style="margin-top:16px">
           <button class="btn btn-sm" data-act="restart">⟳ Restart Xray</button>
           <button class="btn btn-sm" data-act="reload">⚡ Reload Config</button>
+          <button class="btn btn-sm" id="dash-logs">📜 View Logs</button>
+          <button class="btn btn-sm" id="dash-validate">✓ Validate</button>
         </div>
+        <div id="dash-validate-out" class="muted" style="font-size:12px;margin-top:10px"></div>
       </div>`;
     root.innerHTML = html;
     root.querySelector('[data-act="restart"]').onclick = sysRestart;
     root.querySelector('[data-act="reload"]').onclick = sysReload;
+    root.querySelector("#dash-logs").onclick = () => showView("logs");
+    root.querySelector("#dash-validate").onclick = async () => {
+      const out = root.querySelector("#dash-validate-out");
+      out.textContent = "Validating…";
+      try {
+        const r = await api("/xray/validate", { method: "POST" });
+        out.className = r.ok ? "ok" : "error-text";
+        out.style.whiteSpace = "pre-wrap";
+        out.textContent = r.ok ? "✓ Config valid: " + (r.message || "") : "✗ " + (r.message || "") + "\n" + (r.stderr || "");
+      } catch (e) { out.className = "error-text"; out.textContent = e.message; }
+    };
   }
 
   /* ---- Users ---- */
@@ -177,6 +204,9 @@
         <td data-label="IP Limit">${u.ip_limit || "∞"}</td>
         <td data-label="Actions">
           <div class="row-actions">
+            <button class="btn btn-sm" data-act="qr" data-id="${u.id}" title="QR Code">▣</button>
+            <button class="btn btn-sm" data-act="copycfg" data-id="${u.id}" title="Copy Config">⧉</button>
+            <button class="btn btn-sm" data-act="copysub" data-id="${u.id}" title="Copy Subscription">🔗</button>
             <button class="btn btn-sm" data-act="edit" data-id="${u.id}">✎</button>
             <button class="btn btn-sm" data-act="reset" data-id="${u.id}">🔑</button>
             <button class="btn btn-sm ${u.enabled ? "" : "btn-ok"}" data-act="toggle" data-id="${u.id}" data-en="${u.enabled}">${u.enabled ? "⏸" : "▶"}</button>
@@ -216,6 +246,9 @@
         <td data-label="Traffic">${fmtBytes(u.used_traffic_bytes)} / ${u.traffic_limit_bytes ? fmtBytes(u.traffic_limit_bytes) : "∞"}</td>
         <td data-label="IP Limit">${u.ip_limit || "∞"}</td>
         <td data-label="Actions"><div class="row-actions">
+          <button class="btn btn-sm" data-act="qr" data-id="${u.id}" title="QR Code">▣</button>
+          <button class="btn btn-sm" data-act="copycfg" data-id="${u.id}" title="Copy Config">⧉</button>
+          <button class="btn btn-sm" data-act="copysub" data-id="${u.id}" title="Copy Subscription">🔗</button>
           <button class="btn btn-sm" data-act="edit" data-id="${u.id}">✎</button>
           <button class="btn btn-sm" data-act="reset" data-id="${u.id}">🔑</button>
           <button class="btn btn-sm ${u.enabled ? "" : "btn-ok"}" data-act="toggle" data-id="${u.id}" data-en="${u.enabled}">${u.enabled ? "⏸" : "▶"}</button>
@@ -228,7 +261,10 @@
       b.onclick = async () => {
         const id = b.dataset.id;
         try {
-          if (b.dataset.act === "edit") userForm(Number(id));
+          if (b.dataset.act === "qr") showUserQR(Number(id));
+          else if (b.dataset.act === "copycfg") { const u = await api(`/users/${id}`); const d = await api(`/sub/${u.uuid}?format=json`); copyText(d.uris.join("\n"), "Config copied"); }
+          else if (b.dataset.act === "copysub") { const u = await api(`/users/${id}`); copyText(location.origin + "/sub/" + u.uuid, "Subscription copied"); }
+          else if (b.dataset.act === "edit") userForm(Number(id));
           else if (b.dataset.act === "reset") { await api(`/users/${id}/reset-uuid`, { method: "POST" }); toast("UUID reset"); showView("users"); }
           else if (b.dataset.act === "toggle") {
             await api(`/users/${id}/${b.dataset.en === "true" ? "disable" : "enable"}`, { method: "POST" });
@@ -240,6 +276,24 @@
         } catch (e) { toast(e.message, "err"); }
       };
     });
+  }
+  async function showUserQR(id) {
+    const u = await api(`/users/${id}`);
+    const d = await api(`/sub/${u.uuid}?format=json`).catch(() => ({ uris: [] }));
+    const cfg = d.uris[0] || "";
+    openModal(`<h3>QR — ${esc(u.username)}</h3>
+      <div style="display:flex;justify-content:center;padding:12px">
+        <img src="/api/qr/${esc(u.uuid)}" alt="qr" style="width:240px;height:240px;background:#fff;border-radius:12px" />
+      </div>
+      <div class="field"><label>VLESS URI</label><textarea class="codebox" readonly style="min-height:90px">${esc(cfg)}</textarea></div>
+      <div class="field"><label>Subscription URL</label><input readonly value="${esc(location.origin + "/sub/" + u.uuid)}" class="codebox"></div>
+      <div class="modal-actions">
+        <button class="btn" data-c="1">Copy Config</button>
+        <button class="btn" data-s="1">Copy Sub</button>
+        <button class="btn modal-close">Close</button>
+      </div>`);
+    $("#modal-card [data-c]").onclick = () => copyText(cfg, "Config copied");
+    $("#modal-card [data-s]").onclick = () => copyText(location.origin + "/sub/" + u.uuid, "Sub copied");
   }
   function userForm(id) {
     const isEdit = id != null;
@@ -292,7 +346,8 @@
       <tr>
         <td data-label="Tag">${esc(ib.tag)}</td>
         <td data-label="Type">${ib.security} / ${ib.network}</td>
-        <td data-label="Port">${ib.port}${ib.external_port && ib.external_port !== ib.port ? ` <span class=\"badge\">ext:${ib.external_port}</span>` : ""}</td>
+        <td data-label="Domain">${esc(ib.domain || "—")}</td>
+        <td data-label="Port">${ib.port}${ib.external_port && ib.external_port !== ib.port ? ` <span class="badge">ext:${ib.external_port}</span>` : ""}</td>
         <td data-label="Reality">${ib.security === "reality" ? `pbk:${esc(ib.public_key.slice(0, 10))}…` : "—"}</td>
         <td data-label="Status"><span class="badge ${ib.enabled ? "active" : "disabled"}">${ib.enabled ? "on" : "off"}</span></td>
         <td data-label="Actions"><div class="row-actions">
@@ -305,8 +360,8 @@
       <div class="panel glass">
         <div class="panel-head"><h3>INBOUNDS</h3><span class="spacer"></span>
           <button class="btn btn-primary neon btn-sm" id="add-ib">+ New Inbound</button></div>
-        <table class="table"><thead><tr><th>Tag</th><th>Type</th><th>Port</th><th>Reality</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>${rows || `<tr><td colspan="6" class="muted">No inbounds</td></tr>`}</tbody></table>
+        <table class="table"><thead><tr><th>Tag</th><th>Type</th><th>Domain</th><th>Port</th><th>Reality</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="7" class="muted">No inbounds</td></tr>`}</tbody></table>
       </div>`;
     root.querySelector("#add-ib").onclick = () => inboundForm(null);
     root.querySelectorAll("[data-act]").forEach((b) => {
@@ -329,10 +384,11 @@
           <div class="field"><label>Name</label><input name="name"></div>
         </div>
         <div class="field-row">
-          <div class="field"><label>Port</label><input name="port" type="number" min="1" max="65535" value="443"></div>
-          <div class="field"><label>External port (client)</label><input name="external_port" type="number" min="1" max="65535" placeholder="same as Port"></div>
+          <div class="field"><label>Domain (per-inbound; blank=active)</label><input name="domain" placeholder="vpn.example.com"></div>
+          <div class="field"><label>External port (client)</label><input name="external_port" type="number" min="1" max="65535" placeholder="Railway TCP port"></div>
         </div>
         <div class="field-row">
+          <div class="field"><label>Internal port (bind)</label><input name="port" type="number" min="1" max="65535" value="8443"></div>
           <div class="field"><label>Security</label><select name="security"><option value="reality">reality</option><option value="tls">tls</option><option value="none">none</option></select></div>
           <div class="field"><label>Network</label><select name="network"><option value="xhttp">xhttp</option><option value="ws">ws</option><option value="tcp">tcp</option></select></div>
         </div>
@@ -354,7 +410,7 @@
       const payload = {
         name: f.name, port: Number(f.port), security: f.security, network: f.network,
         server_name: f.server_name, spider_x: f.spider_x, transport_path: f.transport_path,
-        ws_host: f.ws_host, xhttp_mode: f.xhttp_mode,
+        domain: f.domain || "", ws_host: f.ws_host, xhttp_mode: f.xhttp_mode,
         external_port: f.external_port ? Number(f.external_port) : null,
         enabled: f.enabled === "1",
       };
@@ -403,7 +459,37 @@
     });
   }
 
-  /* ---- Subscription ---- */
+  /* ---- Xray Logs (live) ---- */
+  async function renderLogs(root) {
+    const last = await api("/xray/last-result").catch(() => ({}));
+    root.innerHTML = `
+      <div class="panel glass">
+        <div class="panel-head"><h3>XRAY LOGS</h3><span class="spacer"></span>
+          <button class="btn btn-sm" id="logs-pause">⏸ Pause</button>
+          <button class="btn btn-sm" id="logs-clear">🗑 Clear</button>
+        </div>
+        <p class="muted" style="font-size:12px">Live tail of xray stdout/stderr. If Xray failed to start, the exact parser error appears here.</p>
+        ${last && last.error ? `<div class="error-text" style="white-space:pre-wrap;font-size:12px">${esc(last.error)}</div>` : ""}
+        <pre id="logs-box" class="codebox" style="min-height:50vh;max-height:70vh;overflow:auto;font-size:11px"></pre>
+      </div>`;
+    const box = root.querySelector("#logs-box");
+    let paused = false;
+    let ws = null;
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    function connect() {
+      ws = new WebSocket(`${proto}//${location.host}/api/xray/logs/stream?token=${encodeURIComponent(TOKEN)}`);
+      ws.onmessage = (e) => { if (!paused) { box.textContent += e.data + "\n"; box.scrollTop = box.scrollHeight; } };
+      ws.onclose = () => { if (!paused) setTimeout(connect, 2000); };
+      ws.onerror = () => { try { ws.close(); } catch {} };
+    }
+    connect();
+    root.querySelector("#logs-pause").onclick = () => { paused = !paused; root.querySelector("#logs-pause").textContent = paused ? "▶ Resume" : "⏸ Pause"; };
+    root.querySelector("#logs-clear").onclick = () => { box.textContent = ""; };
+    // fetch backlog
+    api("/xray/logs?limit=400").then((d) => { box.textContent = (d.lines || []).join("\n"); box.scrollTop = box.scrollHeight; }).catch(() => {});
+  }
+
+  /* ---- Subscription (inline in Users view) ---- */
   async function renderSubscription(root) {
     const users = await api("/users");
     root.innerHTML = `
@@ -441,6 +527,7 @@
           <div><div class="k">Status</div><div class="v" style="font-size:18px">${h.running ? "🟢 Running" : "🔴 Stopped"}</div></div>
           <div><div class="k">PID</div><div class="v" style="font-size:18px">${h.pid ?? "—"}</div></div>
           <div><div class="k">Binary</div><div class="v" style="font-size:13px">${esc(h.binary)}</div></div>
+          <div><div class="k">Version</div><div class="v" style="font-size:13px">${esc(h.version || "unknown")}</div></div>
           <div><div class="k">Config</div><div class="v" style="font-size:13px">${esc(h.config)}</div></div>
         </div>
         <div class="row-actions" style="margin-top:16px">
@@ -449,6 +536,12 @@
           <button class="btn btn-sm" data-act="restart">⟳ Restart</button>
           <button class="btn btn-sm" data-act="reload">⚡ Reload</button>
         </div>
+        <div class="row-actions" style="margin-top:10px">
+          <button class="btn btn-sm" id="view-logs">📜 View Logs</button>
+          <button class="btn btn-sm" id="validate-cfg">✓ Validate Config</button>
+          <a class="btn btn-sm" id="dl-cfg" href="/api/xray/config" target="_blank">⤓ Download config.json</a>
+        </div>
+        <div id="validate-out" class="muted" style="font-size:12px;margin-top:10px"></div>
         <div class="panel glass" style="margin-top:16px">
           <h3>ACCOUNT</h3>
           <button class="btn btn-sm" id="chg-cred">Change username / password</button>
@@ -457,6 +550,16 @@
     const map = { start: sysStart, stop: sysStop, restart: sysRestart, reload: sysReload };
     root.querySelectorAll("[data-act]").forEach((b) => b.onclick = map[b.dataset.act]);
     root.querySelector("#chg-cred").onclick = changeCredentials;
+    root.querySelector("#view-logs").onclick = () => showView("logs");
+    root.querySelector("#validate-cfg").onclick = async () => {
+      const out = root.querySelector("#validate-out");
+      out.textContent = "Validating…";
+      try {
+        const r = await api("/xray/validate", { method: "POST" });
+        if (r.ok) { out.className = "ok"; out.textContent = "✓ Config valid: " + (r.message || ""); }
+        else { out.className = "error-text"; out.style.whiteSpace = "pre-wrap"; out.textContent = "✗ " + (r.message || "invalid") + "\n" + (r.stderr || ""); }
+      } catch (e) { out.className = "error-text"; out.textContent = e.message; }
+    };
   }
   async function sysStart() { try { await api("/system/xray/start", { method: "POST" }); toast("Xray started"); showView("system"); } catch (e) { toast(e.message, "err"); } }
   async function sysStop() { try { await api("/system/xray/stop", { method: "POST" }); toast("Xray stopped"); showView("system"); } catch (e) { toast(e.message, "err"); } }
@@ -644,7 +747,7 @@
     const seg = (location.pathname || "/").replace(/^\/+|\/+$/g, "").split("/")[0];
     const map = {
       login: "login", dashboard: "dashboard", users: "users", inbounds: "inbounds",
-      domains: "domains", subscription: "subscription", system: "system", settings: "settings",
+      domains: "domains", system: "system", logs: "logs", settings: "settings",
     };
     return map[seg] || "dashboard";
   }

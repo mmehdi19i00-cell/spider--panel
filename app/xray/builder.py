@@ -35,16 +35,18 @@ def _build_tls(inbound: Inbound, sni_domain: str) -> dict[str, Any]:
                 }
             ]
         }
-        # ALPN optional
         if inbound.alpn:
             tls["alpn"] = [a.strip() for a in inbound.alpn.split(",") if a.strip()]
         return tls
     # reality
     pk, pubk = ensure_keypair(inbound.private_key, inbound.public_key)
+    # SNI/ServerName shown to clients + the Reality "dest" (the fronting site).
+    # Default target is Apple's mzstatic SNI unless an operator sets server_name.
+    sni = inbound.server_name or "is1-ssl.mzstatic.com"
     return {
         "realitySettings": {
             "show": False,
-            "dest": inbound.server_name or f"{sni_domain}:443",
+            "dest": f"{sni_domain}:443",
             "xver": 0,
             "serverNames": [sni_domain],
             "privateKey": pk,
@@ -68,7 +70,7 @@ def _build_client(user: User) -> dict[str, Any]:
 
 async def build_config(db: AsyncSession) -> dict[str, Any]:
     """Assemble the full Xray config from DB state."""
-    # Active domain drives SNI.
+    # Active domain drives SNI fallback for inbounds without their own domain.
     active_domain = await _active_domain(db)
 
     result = await db.execute(select(Inbound).where(Inbound.enabled.is_(True)))
@@ -81,7 +83,13 @@ async def build_config(db: AsyncSession) -> dict[str, Any]:
 
     inbounds_cfg: list[dict[str, Any]] = []
     for ib in inbounds:
-        sni = active_domain or ib.server_name or "localhost"
+        # Per-inbound domain wins; else the global active domain; else localhost.
+        # (This is the hostname clients connect to — handled by the subscription
+        # builder for the client URI host.)
+        host = ib.domain or active_domain or "localhost"
+        # Reality SNI / fronting target: the inbound's server_name, else the
+        # Apple mzstatic default (editable per inbound via `server_name`).
+        sni = ib.server_name or "is1-ssl.mzstatic.com"
         stream = build_stream_settings(ib)
         # attach TLS/Reality to streamSettings
         if ib.security in ("tls", "reality"):
@@ -97,8 +105,11 @@ async def build_config(db: AsyncSession) -> dict[str, Any]:
 
         inbounds_cfg.append(
             {
+                # Bind an INTERNAL port (never 443 inside Railway). The client
+                # connects via the external/TCP-proxy port (see subscription
+                # builder), so the listen port here is purely server-side.
                 "listen": "0.0.0.0",
-                "port": ib.port,
+                "port": ib.port or settings.internal_xray_port,
                 "protocol": ib.protocol,  # vless
                 "settings": {
                     "clients": clients,
@@ -117,6 +128,14 @@ async def build_config(db: AsyncSession) -> dict[str, Any]:
 
     config = {
         "log": {"loglevel": "warning", "access": "", "error": ""},
+        "dns": {
+            "servers": [
+                "https+local://1.1.1.1/dns-query",
+                "1.1.1.1",
+                "8.8.8.8",
+                "localhost",
+            ]
+        },
         "routing": {
             "domainStrategy": "IPIfNonMatch",
             "rules": [

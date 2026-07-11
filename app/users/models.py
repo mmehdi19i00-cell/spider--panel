@@ -56,6 +56,10 @@ class Inbound(Base):
     tag: Mapped[str] = mapped_column(String(64), unique=True)  # e.g. "vless-reality"
     name: Mapped[str] = mapped_column(String(128), default="")
     protocol: Mapped[str] = mapped_column(String(32), default="vless")  # vless
+    # Domain assigned to THIS inbound. Subscription URIs and the server SNI use
+    # this domain (so each inbound can serve a different domain). Empty -> use
+    # the active domain (global fallback).
+    domain: Mapped[str] = mapped_column(String(255), default="")
     port: Mapped[int] = mapped_column(Integer)  # internal listen port (server binds this)
     # External/reverse-proxy port the *client* should connect to. When set, the
     # server keeps listening on `port` but subscription URIs use `external_port`.

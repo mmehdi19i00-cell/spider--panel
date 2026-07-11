@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
+from app.core.logging import log
 
 
 class Base(DeclarativeBase):
@@ -69,12 +70,47 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db() -> None:
     """Create tables (idempotent). For prod, Alembic migrations are preferred
-    but create_all keeps dev + first-boot simple."""
+    but create_all keeps dev + first-boot simple.
+
+    After creating tables we run a small set of ALTERs for columns added after
+    the original schema (e.g. inbounds.domain). These are no-ops if the column
+    already exists, so existing Railway/postgres databases are upgraded in place
+    without data loss.
+    """
     from app.users import models  # noqa: F401  (register all mappers)
 
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # --- forward migrations (safe ALTERs) ---
+    await _migrate_add_column(engine, "inbounds", "domain", "VARCHAR(255)", default="''")
+
+
+async def _migrate_add_column(engine, table: str, column: str, coltype: str, default: str = "''") -> None:
+    """Add a column if it does not exist (works on SQLite + Postgres)."""
+    try:
+        if engine.dialect.name == "sqlite":
+            async with engine.begin() as conn:
+                # sqlite: inspect columns
+                from sqlalchemy import text
+
+                res = await conn.execute(text(f"PRAGMA table_info({table})"))
+                cols = {row[1] for row in res.fetchall()}
+                if column not in cols:
+                    await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {coltype} DEFAULT {default}"))
+        else:
+            async with engine.begin() as conn:
+                from sqlalchemy import text
+
+                await conn.execute(
+                    text(
+                        f"ALTER TABLE {table} ADD COLUMN {column} {coltype} "
+                        f"DEFAULT {default}"
+                    )
+                )
+    except Exception as e:  # pragma: no cover - migration best-effort
+        log.warning(f"migration skip {table}.{column}: {e}")
 
 
 async def dispose_engine() -> None:

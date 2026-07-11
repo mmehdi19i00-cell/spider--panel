@@ -4,35 +4,59 @@ Reads the SAME Inbound rows the Xray builder reads, so every generated
 VLESS URI matches the running server config exactly. This is the
 single-source-of-truth guarantee: nothing is hand-built from scattered vars.
 
-Subscription endpoints:  /sub/{uuid}  and  /sub/{uuid}?format=clash (raw list)
+Default Reality+XHTTP format produced for every enabled inbound:
+  vless://{uuid}@{domain}:{external_port}
+    ?encryption=none&security=reality&sni={sni}&fp=chrome
+    &pbk={PUBLIC_KEY}&sid={SHORT_ID}&spx=%2F
+    &type=xhttp&path=%2F&mode=auto
+    &extra={urlencoded json}
+    #{username}
+
+The domain is the inbound's own assigned domain (or the active domain), the
+port is the externally-reachable port (Railway TCP proxy / external_port),
+and pbk/sid come straight from the Reality keys stored on the Inbound.
 """
 from __future__ import annotations
 
+import json
 from urllib.parse import quote, urlencode
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.domains import manager as domain_manager
 from app.users.models import Domain, Inbound, User
 
 
-async def _active_domain(db: AsyncSession) -> str | None:
-    res = await db.execute(select(Domain).where(Domain.is_active.is_(True)))
-    dom = res.scalar_one_or_none()
+async def _resolve_domain(db: AsyncSession, inbound: Inbound) -> str:
+    """Domain for an inbound: its own assigned domain, else active, else default."""
+    if inbound.domain:
+        return inbound.domain
+    dom = await domain_manager.get_active(db)
     if dom:
         return dom.domain
-    return settings.public_host or None
+    return settings.public_host or "localhost"
+
+
+def _default_extra() -> str:
+    payload = {
+        "xPaddingBytes": "100-1000",
+        "mode": "auto",
+        "scMaxEachPostBytes": "1000000",
+    }
+    return json.dumps(payload, separators=(",", ":"))
 
 
 def _build_vless(user: User, inbound: Inbound, sni: str, remark: str) -> str:
     host = sni
-    # The server binds `inbound.port`; but the *client* connects to the
-    # externally reachable port, which can differ behind a NAT / TCP proxy.
-    # `external_port` (per-inbound) wins over the global public port when set.
+    # Client connects to the externally reachable port, which can differ from
+    # the internal listen port (Railway TCP proxy / NAT). external_port wins,
+    # then the global public_port (Railway TCP proxy port).
     port = inbound.external_port or settings.public_port
 
     params: dict[str, str] = {
+        "encryption": "none",
         "type": inbound.network,  # xhttp | ws | tcp
         "security": inbound.security,  # reality | tls | none
     }
@@ -46,13 +70,17 @@ def _build_vless(user: User, inbound: Inbound, sni: str, remark: str) -> str:
             params["host"] = inbound.ws_host
 
     if inbound.security == "reality":
+        # sni = the fronting target shown to clients (default Apple mzstatic)
+        sni_for_client = inbound.server_name or "is1-ssl.mzstatic.com"
+        params["sni"] = sni_for_client
+        params["fp"] = "chrome"
         params["pbk"] = inbound.public_key or ""
         params["sid"] = inbound.short_id or ""
-        params["sni"] = sni
-        params["fp"] = "chrome"
-        # spiderX
-        if inbound.spider_x:
-            params["spx"] = inbound.spider_x
+        params["spx"] = inbound.spider_x or "/"
+        if inbound.network == "xhttp":
+            params["path"] = "/"
+            params["mode"] = "auto"
+            params["extra"] = _default_extra()
     elif inbound.security == "tls":
         params["sni"] = sni
 
@@ -65,10 +93,6 @@ def _build_vless(user: User, inbound: Inbound, sni: str, remark: str) -> str:
 
 async def build_subscription(db: AsyncSession, user: User) -> list[str]:
     """Return list of vless URIs for the user's enabled inbounds."""
-    sni = await _active_domain(db)
-    if not sni:
-        sni = "localhost"
-
     res = await db.execute(select(Inbound).where(Inbound.enabled.is_(True)))
     inbounds = res.scalars().all()
 
@@ -77,8 +101,9 @@ async def build_subscription(db: AsyncSession, user: User) -> list[str]:
     for ib in inbounds:
         if tags and ib.tag not in tags:
             continue
+        domain = await _resolve_domain(db, ib)
         remark = f"{user.username} | {ib.tag} | {ib.network}/{ib.security}"
-        uris.append(_build_vless(user, ib, sni, remark))
+        uris.append(_build_vless(user, ib, domain, remark))
     return uris
 
 

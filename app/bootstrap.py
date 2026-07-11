@@ -32,16 +32,18 @@ async def ensure_default_inbound(db: AsyncSession) -> None:
     res = await db.execute(select(Inbound))
     if res.scalars().first() is not None:
         return
-    # Create a default VLESS Reality + XHTTP inbound on XRAY_PORT.
+    # Create a default VLESS Reality + XHTTP inbound on the internal Xray port
+    # (never 443 inside Railway). The client-facing port is the external/TCP
+    # proxy port handled by the subscription builder.
     try:
         await ib_service.create_inbound(
             db,
             tag="vless-reality-xhttp",
             name="VLESS Reality (XHTTP)",
-            port=settings.XRAY_PORT,
+            port=settings.internal_xray_port,
             sec="reality",
             network="xhttp",
-            server_name=settings.public_host,
+            server_name=settings.public_host or "is1-ssl.mzstatic.com",
             spider_x="/",
             transport_path="/",
             xhttp_mode="auto",
