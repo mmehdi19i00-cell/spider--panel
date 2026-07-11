@@ -81,7 +81,12 @@ class XrayProcessManager:
 
     # -- validation -------------------------------------------------------
     def validate_config_file(self, path: str | None = None) -> dict:
-        """Run `xray run -test -config ...`. Returns a structured result."""
+        """Run `xray run -test -config ...`. Returns a structured result.
+
+        On failure we print the FULL xray error (stdout+stderr) so the cause of
+        a broken config is never hidden. If validation fails, the caller must NOT
+        start Xray.
+        """
         path = path or settings.xray_config_path
         binary = settings.XRAY_BINARY_PATH
         result = {
@@ -117,8 +122,18 @@ class XrayProcessManager:
             if proc.returncode == 0:
                 result["ok"] = True
                 result["message"] = result["stdout"] or "config valid"
+                log_xray("validate.ok", config=path)
             else:
-                result["message"] = result["stderr"] or result["stdout"] or "validation failed"
+                # Print the FULL error so the operator sees the real cause.
+                detail = result["stderr"] or result["stdout"] or "validation failed"
+                result["message"] = detail
+                log.error("=" * 60)
+                log.error("XRAY CONFIG VALIDATION FAILED — not starting Xray")
+                log.error(f"command: {result['command']}")
+                log.error(f"--- xray stderr ---\n{detail}")
+                if result["stdout"]:
+                    log.error(f"--- xray stdout ---\n{result['stdout']}")
+                log.error("=" * 60)
         except subprocess.TimeoutExpired as e:
             result["error"] = "validation timed out"
             result["stderr"] = (e.stderr or b"").decode(errors="replace") if isinstance(e.stderr, bytes) else str(e.stderr or "")
@@ -136,6 +151,39 @@ class XrayProcessManager:
         self._last["command"] = result["command"]
         self._last["cwd"] = result["cwd"]
         return result
+
+    def print_startup_banner(
+        self,
+        active_domain: str | None = None,
+        reality_enabled: bool | None = None,
+    ) -> None:
+        """Log the resolved ports / domain / reality state for quick diagnosis.
+
+        `active_domain` and `reality_enabled` are optional pre-computed values
+        (callers in an async context pass them). When omitted we read what we can
+        from the on-disk config without spawning an event loop.
+        """
+        if reality_enabled is None:
+            try:
+                if Path(settings.xray_config_path).exists():
+                    import json
+                    cfg = json.loads(Path(settings.xray_config_path).read_text(encoding="utf-8"))
+                    reality_enabled = any(
+                        (ib.get("streamSettings", {}).get("security") == "reality")
+                        for ib in cfg.get("inbounds", [])
+                    )
+            except Exception:
+                reality_enabled = None
+
+        log.info("=" * 60)
+        log.info("Spider Panel startup summary")
+        log.info(f"  FastAPI port        : {settings.panel_port}")
+        log.info(f"  Xray internal port  : {settings.xray_inbound_port}")
+        log.info(f"  Railway TCP port    : {settings.RAILWAY_TCP_PROXY_PORT or '(not set)'}")
+        log.info(f"  Active domain       : {active_domain or 'none'}")
+        log.info(f"  Reality enabled     : {('yes' if reality_enabled else 'no') if reality_enabled is not None else 'unknown'}")
+        log.info(f"  Xray binary         : {settings.XRAY_BINARY_PATH}")
+        log.info("=" * 60)
 
     # -- control ----------------------------------------------------------
     async def ensure_stopped(self) -> None:

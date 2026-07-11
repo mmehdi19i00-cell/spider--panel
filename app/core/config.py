@@ -21,8 +21,11 @@ class Settings(BaseSettings):
     )
 
     # --- FastAPI / web ---
+    # FastAPI MUST always bind the Railway-injected PORT. It is never shared
+    # with Xray (see XRAY_INBOUND_PORT below). Never hardcode 443/8443/8000.
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+    PANEL_PORT: int = 0  # 0 -> mirror PORT (Railway injects PORT)
     LOG_LEVEL: str = "INFO"
 
     # --- Database ---
@@ -42,11 +45,16 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = ""
 
     # --- Xray core ---
-    # XRAY_PORT = the INTERNAL port the container binds (NEVER 443 inside
-    # Railway — Railway proxies TCP to a private PORT). Defaults to the
-    # Railway-injected PORT when present, else a safe high port.
-    XRAY_BINARY_PATH: str = "/app/xray-core/xray"
-    XRAY_PORT: int = 0  # 0 -> auto-detect (Railway PORT or 8443 fallback)
+    # XRAY_BINARY_PATH: the xray binary installed in the image.
+    XRAY_BINARY_PATH: str = "/usr/local/bin/xray"
+    # XRAY_INBOUND_PORT: the INTERNAL port Xray binds INSIDE the container.
+    # It MUST never equal the FastAPI PORT (Railway injects PORT for the web
+    # dashboard). Xray is reached from the outside only through the Railway
+    # TCP proxy (RAILWAY_TCP_PROXY_PORT), so this is purely server-side.
+    # Fixed default 24567 — do NOT repurpose PORT/443/8443 here.
+    XRAY_INBOUND_PORT: int = 24567
+    # Backwards-compatible alias kept for old deploy configs/tests.
+    XRAY_PORT: int = 0  # 0 -> use XRAY_INBOUND_PORT
     XRAY_API_PORT: int = 10085  # internal stats/control API (loopback only)
     XRAY_CONFIG_PATH: str = ""  # defaults to <DATA_DIR>/xray/config.json
 
@@ -112,29 +120,40 @@ class Settings(BaseSettings):
 
     @computed_field  # type: ignore[prop-decorator]
     @property
+    def panel_port(self) -> int:
+        """Port FastAPI binds — always the Railway-injected PORT.
+
+        We never invent a separate web port; PANEL_PORT mirrors PORT when set.
+        """
+        return self.PANEL_PORT or self.PORT
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def xray_inbound_port(self) -> int:
+        """Port Xray actually binds INSIDE the container.
+
+        Fixed internal port (default 24567). It MUST never equal the FastAPI
+        PORT, so the two processes never fight over the same socket. The
+        client-facing port is the Railway TCP proxy port (public_port), never
+        this one. XRAY_PORT is a legacy alias for XRAY_INBOUND_PORT.
+        """
+        if self.XRAY_PORT and self.XRAY_PORT > 0:
+            return self.XRAY_PORT
+        return self.XRAY_INBOUND_PORT
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
     def public_port(self) -> int:
-        """Port used in client (subscription) links — the externally
-        reachable Railway TCP proxy port, falling back to XRAY_PORT."""
+        """Port used in client (subscription) links — the EXTERNALLY
+        reachable Railway TCP proxy port. NEVER the internal Xray port and
+        NEVER the FastAPI web port. Falls back to internal_xray_port only
+        when no TCP proxy is configured (local/dev)."""
         if self.RAILWAY_TCP_PROXY_PORT:
             try:
                 return int(self.RAILWAY_TCP_PROXY_PORT)
             except ValueError:
                 pass
-        return self.internal_xray_port
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def internal_xray_port(self) -> int:
-        """Port Xray actually binds INSIDE the container.
-
-        Railway injects PORT (the web port) — Xray must NOT use that. So we
-        pick a distinct internal port: explicit XRAY_PORT if set (>0), else
-        fall back to a safe high port (8443). Never 443 (privileged + Railway
-        proxy owns the public edge).
-        """
-        if self.XRAY_PORT and self.XRAY_PORT > 0:
-            return self.XRAY_PORT
-        return 8443
+        return self.xray_inbound_port
 
     @computed_field  # type: ignore[prop-decorator]
     @property

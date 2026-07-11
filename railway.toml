@@ -1,4 +1,12 @@
 # Railway project config for Spider Panel
+#
+# Port architecture (IMPORTANT):
+#   * FastAPI ALWAYS binds the Railway-injected $PORT. Do NOT set PORT here;
+#     Railway injects it. The web dashboard is served on $PORT.
+#   * Xray binds a SEPARATE internal port (XRAY_INBOUND_PORT, default 24567).
+#     It is NEVER the same as $PORT. The public VLESS endpoint is reached
+#     only through the Railway TCP proxy below — never by exposing 24567.
+#   * The Xray binary lives at /usr/local/bin/xray (see Dockerfile).
 
 [build]
 builder = "dockerfile"
@@ -9,25 +17,32 @@ restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 cronDeploy = false
 
-# TCP Proxy for Xray/VLESS
 [[services]]
 name = "spider-panel"
 
+# HTTP port for the FastAPI web dashboard. Railway injects $PORT for this
+# service automatically — do NOT hardcode 8000/443/8443 here.
+[[services.ports]]
+type = "http"
+
+# TCP Proxy for Xray/VLESS. Railway injects RAILWAY_TCP_PROXY_DOMAIN and
+# RAILWAY_TCP_PROXY_PORT for this proxy. Clients connect to those; Railway
+# forwards the TCP proxy to the container's internal Xray port (24567).
+# Never expose 24567 directly.
 [[services.ports]]
 type = "tcp"
 port = 443
 
 [env]
-PORT = "8000"
-XRAY_PORT = "8443"
-XRAY_BINARY_PATH = "/app/xray-core/xray"
+XRAY_BINARY_PATH = "/usr/local/bin/xray"
+XRAY_INBOUND_PORT = "24567"
 DATA_DIR = "/app/data"
 DATABASE_URL = "sqlite+aiosqlite:///./spider.db"
 LOG_LEVEL = "INFO"
 
 # IMPORTANT:
 # Set ADMIN_PASSWORD and SECRET_KEY in Railway Variables.
-# The application will automatically use:
-# RAILWAY_TCP_PROXY_DOMAIN
-# RAILWAY_TCP_PROXY_PORT
-# to generate public VLESS links.
+# Railway automatically injects:
+#   RAILWAY_TCP_PROXY_DOMAIN
+#   RAILWAY_TCP_PROXY_PORT
+# The app uses those to generate public VLESS links (host + port).

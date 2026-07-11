@@ -19,6 +19,7 @@ from app.api import (
     dashboard,
     domains,
     inbounds,
+    news,
     qr,
     settings as settings_router,
     subscription,
@@ -34,13 +35,15 @@ from app.bootstrap import (
 from app.core.config import settings
 from app.core.logging import log
 from app.database import dispose_engine, get_sessionmaker, init_db
+from app.domains import manager as domain_manager
 from app.xray.builder import write_config
 from app.xray.process import manager
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    log.info("Spider Panel starting", extra={"payload": {"port": settings.PORT, "db": settings.db_url.split("://")[0]}})
+    # FastAPI ALWAYS binds the Railway-injected PORT. Never share it with Xray.
+    log.info(f"Spider Panel started port: {settings.panel_port}")
     # 1. schema
     await init_db()
     # 2. first-run data
@@ -48,11 +51,37 @@ async def lifespan(app: FastAPI):
         await ensure_admin(db)
         await ensure_default_inbound(db)
         await ensure_default_domain(db)
+
+        # Resolve active domain + reality state for the startup banner.
+        active_domain = None
+        dom = await domain_manager.get_active(db)
+        if dom:
+            active_domain = dom.domain
+        from app.xray.builder import build_config
+        cfg = await build_config(db)
+        reality_enabled = any(
+            (ib.get("streamSettings", {}).get("security") == "reality")
+            for ib in cfg.get("inbounds", [])
+        )
+
         # 3. initial config
         await write_config(db)
+        log.info("Config written:")
+        for ib in cfg.get("inbounds", []):
+            ss = ib.get("streamSettings", {})
+            if ss.get("security") == "reality":
+                log.info(f"Xray inbound: 0.0.0.0:{settings.xray_inbound_port}")
+
         # 4. start xray (best effort; fails loud in logs if config invalid)
         started = await manager.start()
-        log.info(f"xray auto-start: {'ok' if started else 'skipped/failed'}")
+        manager.print_startup_banner(
+            active_domain=active_domain,
+            reality_enabled=reality_enabled,
+        )
+        if started:
+            log.info("Xray started successfully.")
+        else:
+            log.error("Xray did NOT start — see validation errors above.")
     yield
     # shutdown: stop xray, reap child, close pool
     await manager.stop()
@@ -94,7 +123,7 @@ class CSRFTokenMiddleware(BaseHTTPMiddleware):
 app.add_middleware(CSRFTokenMiddleware)
 
 # API routers
-for r in (auth, users, dashboard, inbounds, domains, qr, subscription, system, settings_router, xray_logs):
+for r in (auth, users, dashboard, inbounds, domains, qr, subscription, system, settings_router, news, xray_logs):
     app.include_router(r.router)
 
 

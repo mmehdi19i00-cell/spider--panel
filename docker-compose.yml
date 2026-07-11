@@ -1,5 +1,11 @@
 # Spider Panel — docker-compose (local dev / VPS)
 # For Railway use railway.toml instead (Railway builds the Dockerfile directly).
+#
+# Port architecture:
+#   * Web (FastAPI/uvicorn) binds ${PORT} (Railway injects $PORT on Railway).
+#   * Xray binds a SEPARATE internal port (XRAY_INBOUND_PORT=24567) and is
+#     reachable externally only via a TCP proxy to RAILWAY_TCP_PROXY_PORT.
+#     The two processes NEVER share a port.
 
 services:
   spider-panel:
@@ -19,9 +25,9 @@ services:
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-admin}"
       # --- Database: sqlite by default; set DATABASE_URL for postgres ---
       DATABASE_URL: "${DATABASE_URL:-sqlite+aiosqlite:///./spider.db}"
-      # --- Xray ---
-      XRAY_BINARY_PATH: "/app/xray-core/xray"
-      XRAY_PORT: "${XRAY_PORT:-8443}"
+      # --- Xray (separate internal port — never the web PORT) ---
+      XRAY_BINARY_PATH: "/usr/local/bin/xray"
+      XRAY_INBOUND_PORT: "24567"
       # --- Public link host (leave blank to auto-detect Railway TCP proxy) ---
       RAILWAY_TCP_PROXY_DOMAIN: "${RAILWAY_TCP_PROXY_DOMAIN:-}"
       RAILWAY_TCP_PROXY_PORT: "${RAILWAY_TCP_PROXY_PORT:-}"

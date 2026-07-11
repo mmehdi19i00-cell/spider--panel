@@ -29,7 +29,7 @@ def validate_config(config: dict[str, Any]) -> tuple[bool, list[str]]:
         # Privileged ports (1-1023) inside the container conflict with Railway's
         # proxy edge — but that's a deployment concern, not a config-validity
         # bug (xray itself accepts them). The manager/builder enforce the safe
-        # internal_xray_port at runtime.
+        # xray_inbound_port at runtime.
         ss = ib.get("streamSettings", {})
         sec = ss.get("security")
         if sec == "reality":
@@ -50,7 +50,7 @@ def validate_config(config: dict[str, Any]) -> tuple[bool, list[str]]:
                 errors.append(f"{ib.get('tag')}: tls missing certificates")
         # NOTE: "no clients" and privileged ports are deployment concerns, not
         # config-validity bugs — xray accepts them. The Railway port safety is
-        # enforced at runtime via settings.internal_xray_port / bootstrap.
+        # enforced at runtime via settings.xray_inbound_port / bootstrap.
         clients = (ib.get("settings") or {}).get("clients") or []
         for c in clients:
             if not c.get("id"):

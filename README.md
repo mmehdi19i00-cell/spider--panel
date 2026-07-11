@@ -35,7 +35,7 @@ limits and traffic quotas — all wrapped in a mobile-first glassmorphism dashbo
 ```
 app/
   core/
-    config.py        # env-driven settings (PORT, DATABASE_URL, XRAY_PORT, …)
+    config.py        # env-driven settings (PORT, XRAY_INBOUND_PORT, RAILWAY_TCP_PROXY_*, …)
     security.py       # JWT, bcrypt, X25519 Reality keys (cryptography == xray x25519)
     logging.py        # structured audit logging for config generation
   xray/
@@ -80,35 +80,41 @@ tests/test_spider_panel.py  # full test suite
 ## 🚀 Deployment on Railway
 
 1. **Create a new Railway project** and link this repo (or use `railway link`).
-2. Railway auto-detects the `Dockerfile` and builds it. The multi-stage
-   build downloads the **latest official Xray-core** at build time.
+2. Railway auto-detects the `Dockerfile` and builds it. The build installs
+   the **latest official xray-core** to `/usr/local/bin/xray` at build time.
 3. **Add a Volume** in the Railway dashboard and mount it at `/app/data`
    (the app stores SQLite + the generated `xray/config.json` there). Railway
    does **not** support the `VOLUME` instruction in Dockerfiles, so the
    volume is configured in the dashboard, not in the image.
-4. **Add a TCP Proxy** service for the VLESS port (default `443`). Railway
-   injects `RAILWAY_TCP_PROXY_DOMAIN` and `RAILWAY_TCP_PROXY_PORT`, which the
-   app reads automatically to build public subscription links. The **web**
-   dashboard is served on `PORT` (Railway's HTTP service).
+4. **Add a TCP Proxy** for the VLESS port. Railway injects
+   `RAILWAY_TCP_PROXY_DOMAIN` and `RAILWAY_TCP_PROXY_PORT`; the app reads
+   them automatically to build public subscription links. The **web** dashboard
+   is served on `PORT` (Railway's HTTP service). The TCP proxy is the ONLY
+   public path to Xray — the internal Xray port (24567) is never exposed.
 5. **Set environment variables** in the Railway dashboard:
    | Variable | Required | Notes |
    |----------|----------|-------|
    | `ADMIN_PASSWORD` | ✅ | Strong password for first admin |
    | `SECRET_KEY` | ✅ | `python -c "import secrets;print(secrets.token_urlsafe(48))"` |
    | `ADMIN_USERNAME` | ⬜ | default `admin` |
-   | `XRAY_PORT` | ⬜ | default `443` |
+   | `XRAY_BINARY_PATH` | ⬜ | default `/usr/local/bin/xray` |
+   | `XRAY_INBOUND_PORT` | ⬜ | default `24567` (internal only; never the web `PORT`) |
    | `DATA_DIR` | ⬜ | set to `/app/data` (the mounted volume) |
    | `DATABASE_URL` | ⬜ | default SQLite; use Postgres in prod |
    | `RAILWAY_TCP_PROXY_DOMAIN/PORT` | auto | injected by Railway TCP proxy |
 6. **Deploy.** On first boot the app:
    - creates tables,
    - creates the admin account (if none exists),
-   - creates a default **VLESS Reality + XHTTP** inbound on `XRAY_PORT`,
+   - creates a default **VLESS Reality + XHTTP** inbound on the internal port `24567`,
    - writes `config.json`,
-   - and starts Xray.
+   - validates it (`xray run -test`), and starts Xray.
 
-> Never expose internal ports. The public VLESS endpoint is the Railway TCP
-> proxy domain/port — never the web `PORT`.
+> **Port separation (critical):** FastAPI binds the Railway-injected `PORT` only.
+> Xray binds its own internal port (`XRAY_INBOUND_PORT`, default `24567`) — never
+> the web `PORT`, never `443`/`8443`. The public VLESS endpoint is **only** the
+> Railway TCP proxy (`RAILWAY_TCP_PROXY_DOMAIN:RAILWAY_TCP_PROXY_PORT`) — it
+> forwards to `24567` inside the container. Subscription links always use the TCP
+> proxy port, never `24567`.
 
 ---
 
@@ -180,8 +186,21 @@ falls back to `cryptography`, which is **byte-identical** to `xray x25519`):
 | POST | `/api/domains/{domain}/activate` | ✅ | Switch active domain (+reload) |
 | GET | `/sub/{uuid}` | ❌ | Subscription (`?format=json`) |
 | GET/POST | `/api/system/xray/*` | ✅ | health/start/stop/restart/reload |
+| GET | `/api/settings/music/list` | ✅ | List audio files in `/musics` |
+| GET | `/api/news` | ✅ | Latest Iran news (RSS, text-only, `?query=&limit=`) |
 
 ---
+
+## 🎵 Music on open & 📰 News
+
+- **Music:** drop `.mp3`/`.ogg`/`.wav`/`.m4a`/`.webm`/`.aac`/`.flac` files into
+  `app/static/musics/`. Every time the panel opens, a **random** track plays
+  automatically (toggle in *Settings → Music on open*, on by default). Served at
+  `/musics` and listed by `GET /api/settings/music/list`.
+- **News:** the sidebar *News* tab opens a scrollable box with the latest **Iran**
+  news (fetched live from an RSS feed, text only — long articles scroll inside the
+  box, never resize it). Use the search box to query any topic, and Prev/Next to
+  browse the fetched items. Results are cached ~10 min.
 
 ## 🔐 Security
 

@@ -110,10 +110,12 @@
     system: renderSystem,
     logs: renderLogs,
     settings: renderSettings,
+    news: renderNews,
   };
   const titles = {
     dashboard: "Dashboard", users: "Users", inbounds: "Inbounds",
     domains: "Domains", system: "System", logs: "Xray Logs", settings: "Settings",
+    news: "News",
   };
 
   async function showView(name) {
@@ -589,7 +591,7 @@
   async function renderSettings(root) {
     const s = await api("/settings").catch(() => ({}));
     const music = await api("/settings/music/list").catch(() => ({ files: [] }));
-    const onOpen = s.music_on_open === "1";
+    const onOpen = s.music_on_open === "1" || s.music_on_open === "" || s.music_on_open === undefined;
     const files = music.files || [];
     root.innerHTML = `
       <div class="panel glass">
@@ -671,10 +673,79 @@
     });
   }
 
+  /* ---- News (latest Iran news, text only, scrollable) ---- */
+  let _newsItems = [];
+  let _newsIdx = 0;
+  async function renderNews(root) {
+    root.innerHTML = `
+      <div class="panel glass">
+        <div class="panel-head">
+          <h3>📰 LATEST NEWS · IRAN</h3>
+          <span class="spacer"></span>
+          <input id="news-q" class="field" style="margin:0;max-width:180px" placeholder="search…" value="Iran" />
+          <button class="btn btn-primary neon btn-sm" id="news-search">Search</button>
+          <button class="btn btn-sm" id="news-refresh">⟳ Refresh</button>
+        </div>
+        <p class="muted" style="font-size:12px">Latest Iran news, fetched live. Text only — scroll inside the box if it's long.</p>
+        <div id="news-box" class="news-box">
+          <div class="muted" style="padding:20px">Loading…</div>
+        </div>
+        <div class="row-actions" style="margin-top:12px">
+          <button class="btn btn-sm" id="news-prev">‹ Prev</button>
+          <span id="news-pos" class="sub"></span>
+          <button class="btn btn-sm" id="news-next">Next ›</button>
+          <span class="spacer"></span>
+          <a class="btn btn-sm" id="news-link" target="_blank" rel="noopener noreferrer" style="display:none">↗ Open source</a>
+        </div>
+      </div>`;
+
+    const box = root.querySelector("#news-box");
+    const pos = root.querySelector("#news-pos");
+    const link = root.querySelector("#news-link");
+
+    function renderItem() {
+      const it = _newsItems[_newsIdx];
+      if (!it) { box.innerHTML = `<div class="muted" style="padding:20px">No news available right now.</div>`; return; }
+      box.innerHTML = `
+        <div class="news-title">${esc(it.title)}</div>
+        ${it.source ? `<div class="news-meta">${esc(it.source)}${it.published ? " · " + esc(it.published) : ""}</div>` : ""}
+        <div class="news-text">${esc(it.text)}</div>`;
+      box.scrollTop = 0;
+      pos.textContent = `${_newsIdx + 1} / ${_newsItems.length}`;
+      if (it.link) { link.href = it.link; link.style.display = ""; } else { link.style.display = "none"; }
+    }
+
+    async function load(q) {
+      box.innerHTML = `<div class="muted" style="padding:20px">Searching…</div>`;
+      try {
+        const d = await api("/news?query=" + encodeURIComponent(q || "Iran") + "&limit=8");
+        _newsItems = d.items || [];
+        _newsIdx = 0;
+        if (!_newsItems.length) {
+          box.innerHTML = `<div class="muted" style="padding:20px">${esc(d.error ? "Couldn't load news: " + d.error : "No news found.")}</div>`;
+          pos.textContent = "0 / 0"; link.style.display = "none";
+          return;
+        }
+        renderItem();
+      } catch (e) {
+        box.innerHTML = `<div class="error-text" style="padding:20px">${esc(e.message)}</div>`;
+      }
+    }
+
+    root.querySelector("#news-search").onclick = () => load(root.querySelector("#news-q").value.trim() || "Iran");
+    root.querySelector("#news-q").onkeydown = (e) => { if (e.key === "Enter") load(root.querySelector("#news-q").value.trim() || "Iran"); };
+    root.querySelector("#news-refresh").onclick = () => load(root.querySelector("#news-q").value.trim() || "Iran");
+    root.querySelector("#news-prev").onclick = () => { if (_newsItems.length) { _newsIdx = (_newsIdx - 1 + _newsItems.length) % _newsItems.length; renderItem(); } };
+    root.querySelector("#news-next").onclick = () => { if (_newsItems.length) { _newsIdx = (_newsIdx + 1) % _newsItems.length; renderItem(); } };
+    await load("Iran");
+  }
+
   /* ---- autoplay on open ---- */
   function maybePlayMusicOnOpen() {
-    // Only when an admin is signed in (app view visible) and the toggle is on.
-    const enabled = localStorage.getItem("spider_music_on_open") === "1";
+    // Default ON: if the user has never toggled it, treat as enabled.
+    const pref = localStorage.getItem("spider_music_on_open");
+    const enabled = pref === null || pref === "1";
+    if (pref === null) localStorage.setItem("spider_music_on_open", "1");
     if (!enabled) return;
     if (document.getElementById("app-view") && !document.getElementById("app-view").hidden) {
       api("/settings/music/list").then((m) => playRandomMusic(m.files)).catch(() => {});
@@ -747,7 +818,7 @@
     const seg = (location.pathname || "/").replace(/^\/+|\/+$/g, "").split("/")[0];
     const map = {
       login: "login", dashboard: "dashboard", users: "users", inbounds: "inbounds",
-      domains: "domains", system: "system", logs: "logs", settings: "settings",
+      domains: "domains", system: "system", logs: "logs", settings: "settings", news: "news",
     };
     return map[seg] || "dashboard";
   }

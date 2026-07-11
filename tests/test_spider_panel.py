@@ -229,6 +229,112 @@ async def test_subscription_uri_ws(session):
 
 
 # ---------------------------------------------------------------------------
+# Tests: Railway port separation (the core architecture fix)
+# ---------------------------------------------------------------------------
+def test_ports_are_separated_by_default():
+    from app.core.config import Settings
+
+    s = Settings(XRAY_BINARY_PATH="/usr/local/bin/xray", XRAY_INBOUND_PORT=24567)
+    # FastAPI binds the Railway-injected PORT; Xray binds its own internal port.
+    assert s.xray_inbound_port != s.panel_port, "xray must not share the web PORT"
+    assert s.xray_inbound_port == 24567
+    # public (client-facing) port comes from the Railway TCP proxy, NOT 24567.
+    s2 = Settings(
+        XRAY_BINARY_PATH="/usr/local/bin/xray",
+        XRAY_INBOUND_PORT=24567,
+        RAILWAY_TCP_PROXY_PORT="12345",
+        RAILWAY_TCP_PROXY_DOMAIN="x.example.com",
+    )
+    assert s2.public_port == 12345
+    assert s2.public_port != s2.xray_inbound_port
+    assert s2.public_host == "x.example.com"
+
+
+def test_fastapi_uses_railway_port_only(monkeypatch):
+    from app.core.config import Settings
+
+    monkeypatch.setenv("PORT", "8080")
+    s = Settings(XRAY_BINARY_PATH="/usr/local/bin/xray", XRAY_INBOUND_PORT=24567)
+    # FastAPI must use the injected PORT and never the xray internal port.
+    assert s.panel_port == 8080
+    assert s.xray_inbound_port == 24567
+    assert s.panel_port != s.xray_inbound_port
+
+
+async def test_subscription_uses_tcp_proxy_port_not_internal(session):
+    from app.core import config as cfgmod
+    from app.domains import manager as dm
+    from app.inbounds import service as ib_service
+    from app.subscriptions import builder as sub
+    from app.subscriptions.validator import assert_valid_subscription
+    from app.users import service as us
+
+    # Pin the Railway TCP proxy env (what the app would see on Railway).
+    import os
+    monkeypatch = _mp()
+    monkeypatch.setenv("XRAY_BINARY_PATH", "/nonexistent/xray")
+    monkeypatch.setenv("XRAY_INBOUND_PORT", "24567")
+    monkeypatch.setenv("RAILWAY_TCP_PROXY_DOMAIN", "real.example.com")
+    monkeypatch.setenv("RAILWAY_TCP_PROXY_PORT", "54321")
+
+    ib = await ib_service.create_inbound(
+        session, tag="reality-xhttp", name="t", port=24567,
+        sec="reality", network="xhttp", server_name="example.com",
+    )
+    await dm.add_domain(session, "real.example.com")
+    await dm.set_active(session, "real.example.com")
+    u = await us.create_user(session, username="carol", expire_days=30)
+
+    # re-read settings object the builder uses
+    cfgmod.settings.RAILWAY_TCP_PROXY_DOMAIN = "real.example.com"
+    cfgmod.settings.RAILWAY_TCP_PROXY_PORT = "54321"
+    cfgmod.settings.XRAY_INBOUND_PORT = 24567
+
+    uris = await sub.build_subscription(session, u)
+    assert_valid_subscription(uris)
+    uri = uris[0]
+    # host = active domain, port = TCP proxy port (NEVER the internal 24567)
+    assert "@real.example.com:54321" in uri, uri
+    assert ":24567" not in uri, "link must not expose internal xray port"
+    # xhttp reality canonical params present
+    assert "type=xhttp" in uri and "path=%2F" in uri and "mode=auto" in uri
+    assert "extra=" in uri
+    # extra decodes to the spec shape
+    import json
+    from urllib.parse import parse_qs, urlparse
+    qs = parse_qs(urlparse(uri).query, keep_blank_values=True)
+    extra = json.loads(qs["extra"][0])
+    assert extra.get("xPaddingBytes") == "100-1000"
+    assert extra.get("mode") == "auto"
+    assert "scMaxEachPostBytes" in extra
+
+
+class _MP:
+    def __init__(self):
+        import os
+        self._os = os
+        self._saved = {}
+
+    def setenv(self, k, v):
+        self._saved[k] = self._os.environ.get(k)
+        self._os.environ[k] = v
+
+
+def _mp():
+    return _MP()
+
+
+async def test_default_extra_matches_spec():
+    import json
+
+    from app.subscriptions import builder as sub
+
+    extra = json.loads(sub._default_extra())
+    assert extra == {"xPaddingBytes": "100-1000", "mode": "auto",
+                     "scMaxEachPostBytes": "1000000"}
+
+
+# ---------------------------------------------------------------------------
 # Tests: users / expiration / ip limit
 # ---------------------------------------------------------------------------
 async def test_user_lifecycle(session):
@@ -335,6 +441,141 @@ def test_auth_flow(tmp_db):
     r = client.get(f"/sub/{uuid}")
     assert r.status_code == 200
     assert "vless://" in r.text
+
+
+# ---------------------------------------------------------------------------
+# Tests: News endpoint (RSS parsing, mocked network)
+# ---------------------------------------------------------------------------
+def test_news_parses_rss_and_strips_html(monkeypatch):
+    import io
+    from app.api import news as news_mod
+
+    sample = b"""<?xml version="1.0" encoding="UTF-8"?>
+    <rss version="2.0"><channel>
+      <item>
+        <title>Iran holds talks - Reuters</title>
+        <link>https://example.com/a</link>
+        <description>&lt;p&gt;Officials &lt;b&gt;met&lt;/b&gt; today to discuss &lt;i&gt;the deal&lt;/i&gt;.&lt;/p&gt;</description>
+        <pubDate>Mon, 10 Jul 2026 10:00:00 GMT</pubDate>
+        <source url="https://reuters.com">Reuters</source>
+      </item>
+      <item>
+        <title>Markets react</title>
+        <link>https://example.com/b</link>
+        <description>Stocks moved.</description>
+        <pubDate>Sun, 09 Jul 2026 10:00:00 GMT</pubDate>
+      </item>
+    </channel></rss>"""
+
+    class _Resp:
+        def read(self):
+            return sample
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(news_mod.urllib.request, "urlopen", lambda *a, **k: _Resp())
+    news_mod._cache.clear()
+    items = news_mod._fetch("Iran", 8)
+    assert len(items) == 2
+    # newest first (10 Jul before 09 Jul)
+    assert items[0]["title"] == "Iran holds talks"
+    # source suffix stripped, HTML stripped, entities unescaped
+    assert items[0]["source"] == "Reuters"
+    assert "Officials met today to discuss the deal." in items[0]["text"]
+    assert "<" not in items[0]["text"]
+
+
+def test_news_endpoint_requires_auth(tmp_db):
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    c = TestClient(app)
+    r = c.get("/api/news")
+    assert r.status_code in (401, 403)
+
+
+def test_news_endpoint_with_auth(tmp_db, monkeypatch):
+    import asyncio
+    from app.bootstrap import ensure_admin
+    from app.database import get_sessionmaker
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    async def _seed():
+        await init_db()
+        async with get_sessionmaker()() as s:
+            await ensure_admin(s)
+    asyncio.run(_seed())
+
+    import io
+    from app.api import news as news_mod
+    sample = b"""<?xml version="1.0"?><rss version="2.0"><channel>
+      <item><title>Headline - Src</title><link>https://x/1</link>
+      <description>&lt;p&gt;Body text here.&lt;/p&gt;</description>
+      <pubDate>Mon, 10 Jul 2026 10:00:00 GMT</pubDate>
+      <source url="https://x">Src</source></item></channel></rss>"""
+
+    class _Resp:
+        def read(self):
+            return sample
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(news_mod.urllib.request, "urlopen", lambda *a, **k: _Resp())
+    news_mod._cache.clear()
+
+    c = TestClient(app)
+    tok = c.post("/api/auth/token", data={"username": "admin", "password": "testpass123"}).json()["access_token"]
+    r = c.get("/api/news", headers={"Authorization": f"Bearer {tok}"})
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["ok"] is True
+    assert data["count"] == 1
+    assert data["items"][0]["title"] == "Headline"
+    assert "Body text here." in data["items"][0]["text"]
+
+
+# ---------------------------------------------------------------------------
+# Tests: Music folder listing
+# ---------------------------------------------------------------------------
+def test_music_list_empty(tmp_db):
+    from app.api import settings as settings_router
+    from app.main import app
+    from fastapi.testclient import TestClient
+    import asyncio
+    from app.bootstrap import ensure_admin
+    from app.database import get_sessionmaker
+
+    async def _seed():
+        await init_db()
+        async with get_sessionmaker()() as s:
+            await ensure_admin(s)
+    asyncio.run(_seed())
+
+    c = TestClient(app)
+    tok = c.post("/api/auth/token", data={"username": "admin", "password": "testpass123"}).json()["access_token"]
+    r = c.get("/api/settings/music/list", headers={"Authorization": f"Bearer {tok}"})
+    assert r.status_code == 200
+    # musics dir exists (gitkeep only) -> no audio files
+    assert r.json()["files"] == []
+
+
+def test_music_list_lists_audio(tmp_db, monkeypatch):
+    import os
+    from pathlib import Path
+    from app.api import settings as settings_router
+
+    d = Path(tempfile.mkdtemp())
+    (d / "song one.mp3").write_bytes(b"\x00")
+    (d / "song two.ogg").write_bytes(b"\x00")
+    (d / "ignore.txt").write_text("nope")
+    monkeypatch.setattr(settings_router, "_MUSICS_DIR", d)
+    files = settings_router.list_music_files()
+    assert set(files) == {"song one.mp3", "song two.ogg"}
 
 
 # ---------------------------------------------------------------------------

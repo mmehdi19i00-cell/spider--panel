@@ -40,7 +40,7 @@ async def ensure_default_inbound(db: AsyncSession) -> None:
             db,
             tag="vless-reality-xhttp",
             name="VLESS Reality (XHTTP)",
-            port=settings.internal_xray_port,
+            port=settings.xray_inbound_port,
             sec="reality",
             network="xhttp",
             server_name=settings.public_host or "is1-ssl.mzstatic.com",

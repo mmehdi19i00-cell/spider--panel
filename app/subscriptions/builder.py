@@ -30,7 +30,12 @@ from app.users.models import Domain, Inbound, User
 
 
 async def _resolve_domain(db: AsyncSession, inbound: Inbound) -> str:
-    """Domain for an inbound: its own assigned domain, else active, else default."""
+    """Domain for an inbound: its own assigned domain, else active, else default.
+
+    The active domain comes from Domain Management (the operator-set active
+    domain). This is the host clients connect to — it is NEVER the internal
+    Xray port or the FastAPI web port.
+    """
     if inbound.domain:
         return inbound.domain
     dom = await domain_manager.get_active(db)
@@ -40,6 +45,10 @@ async def _resolve_domain(db: AsyncSession, inbound: Inbound) -> str:
 
 
 def _default_extra() -> str:
+    """URL-safe JSON for the xhttp `extra` param (matches the spec link).
+
+    Decoded shape: {"xPaddingBytes":"100-1000","mode":"auto","scMaxEachPostBytes":"1000000"}
+    """
     payload = {
         "xPaddingBytes": "100-1000",
         "mode": "auto",
@@ -50,9 +59,10 @@ def _default_extra() -> str:
 
 def _build_vless(user: User, inbound: Inbound, sni: str, remark: str) -> str:
     host = sni
-    # Client connects to the externally reachable port, which can differ from
-    # the internal listen port (Railway TCP proxy / NAT). external_port wins,
-    # then the global public_port (Railway TCP proxy port).
+    # Client connects to the EXTERNALLY reachable port — the Railway TCP proxy
+    # port (RAILWAY_TCP_PROXY_PORT). This is NEVER the internal Xray listen
+    # port (24567) and NEVER the FastAPI web PORT. `external_port` is an
+    # optional per-inbound override; otherwise we use the public (TCP proxy) port.
     port = inbound.external_port or settings.public_port
 
     params: dict[str, str] = {
@@ -77,6 +87,9 @@ def _build_vless(user: User, inbound: Inbound, sni: str, remark: str) -> str:
         params["pbk"] = inbound.public_key or ""
         params["sid"] = inbound.short_id or ""
         params["spx"] = inbound.spider_x or "/"
+        # xhttp reality: force the canonical path/mode + the xhttp extra block.
+        # The extra carries xPaddingBytes / mode / scMaxEachPostBytes exactly
+        # as the client needs them.
         if inbound.network == "xhttp":
             params["path"] = "/"
             params["mode"] = "auto"

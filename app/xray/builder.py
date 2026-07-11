@@ -109,7 +109,7 @@ async def build_config(db: AsyncSession) -> dict[str, Any]:
                 # connects via the external/TCP-proxy port (see subscription
                 # builder), so the listen port here is purely server-side.
                 "listen": "0.0.0.0",
-                "port": ib.port or settings.internal_xray_port,
+                "port": ib.port or settings.xray_inbound_port,
                 "protocol": ib.protocol,  # vless
                 "settings": {
                     "clients": clients,
