@@ -26,8 +26,10 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # --- Database ---
-    # SQLite for dev, postgresql+asyncpg://... for prod (Railway provides DATABASE_URL)
-    DATABASE_URL: str = "sqlite+aiosqlite:///./data/spider.db"
+    # SQLite for dev, postgresql+asyncpg://... for prod (Railway provides DATABASE_URL).
+    # Relative sqlite paths resolve under DATA_DIR (see db_url below), so the db
+    # file lives directly in DATA_DIR, e.g. <DATA_DIR>/spider.db.
+    DATABASE_URL: str = "sqlite+aiosqlite:///./spider.db"
 
     # --- Secrets / auth ---
     SECRET_KEY: str = ""
@@ -77,15 +79,21 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def db_url(self) -> str:
-        """Return an absolute DB url so relative sqlite paths resolve under DATA_DIR."""
+        """Return an absolute DB url so relative sqlite paths resolve under DATA_DIR.
+
+        The db file's parent directory is created on access so the engine never
+        fails with "unable to open database file" due to a missing directory.
+        """
         url = self.DATABASE_URL
-        if url.startswith("sqlite") and ":///" not in url.replace("sqlite+aiosqlite://", "sqlite://"):
-            # already absolute (sqlite:////abs)
-            return url
-        if url.startswith("sqlite") and ":///" in url:
-            prefix, rel = url.split(":///", 1)
-            if not rel.startswith("/"):
-                return f"{prefix}:///{Path(self.data_dir) / rel}"
+        if url.startswith("sqlite"):
+            prefix, sep, rel = url.partition(":///")
+            if sep:
+                # Absolute path already (sqlite:////abs or sqlite+aiosqlite:////abs).
+                if rel.startswith("/"):
+                    return url
+                db_file = Path(self.data_dir) / rel
+                db_file.parent.mkdir(parents=True, exist_ok=True)
+                return f"{prefix}:///{db_file}"
         return url
 
     @computed_field  # type: ignore[prop-decorator]

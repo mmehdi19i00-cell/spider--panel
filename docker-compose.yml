@@ -18,7 +18,7 @@ services:
       ADMIN_USERNAME: "${ADMIN_USERNAME:-admin}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-changeme123}"
       # --- Database: sqlite by default; set DATABASE_URL for postgres ---
-      DATABASE_URL: "${DATABASE_URL:-sqlite+aiosqlite:///./data/spider.db}"
+      DATABASE_URL: "${DATABASE_URL:-sqlite+aiosqlite:///./spider.db}"
       # --- Xray ---
       XRAY_BINARY_PATH: "/usr/local/bin/xray"
       XRAY_PORT: "${XRAY_PORT:-443}"

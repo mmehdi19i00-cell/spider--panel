@@ -335,3 +335,50 @@ def test_auth_flow(tmp_db):
     r = client.get(f"/sub/{uuid}")
     assert r.status_code == 200
     assert "vless://" in r.text
+
+
+# ---------------------------------------------------------------------------
+# Regression: DB path resolution (the data/data doubling + missing-dir crash)
+# ---------------------------------------------------------------------------
+def test_db_url_resolves_under_data_dir_and_creates_parent(monkeypatch):
+    import tempfile
+    from pathlib import Path
+
+    from app.core.config import Settings
+
+    # No DATABASE_URL env -> exercise the default path.
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    d = tempfile.mkdtemp(prefix="spider_dbtest_")
+    s = Settings(DATA_DIR=d)
+
+    assert s.db_url.startswith("sqlite")
+    db_file = s.db_url.split(":///", 1)[1]
+    # The db must sit directly in DATA_DIR, NOT DATA_DIR/data (the old bug).
+    assert db_file == str(Path(d) / "spider.db"), db_file
+    # db_url access must create the parent directory so the engine can connect.
+    assert Path(db_file).parent.is_dir()
+
+
+def test_db_url_absolute_path_is_preserved(monkeypatch):
+    from app.core.config import Settings
+
+    monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:////abs/path/spider.db")
+    import tempfile
+
+    d = tempfile.mkdtemp(prefix="spider_dbtest_abs_")
+    s = Settings(DATA_DIR=d)
+    # Absolute sqlite urls must be returned unchanged.
+    assert s.db_url == "sqlite+aiosqlite:////abs/path/spider.db"
+
+
+def test_db_url_postgres_passthrough(monkeypatch):
+    from app.core.config import Settings
+
+    monkeypatch.setenv(
+        "DATABASE_URL", "postgresql+asyncpg://u:p@db:5432/spider"
+    )
+    import tempfile
+
+    d = tempfile.mkdtemp(prefix="spider_dbtest_pg_")
+    s = Settings(DATA_DIR=d)
+    assert s.db_url == "postgresql+asyncpg://u:p@db:5432/spider"
