@@ -11,6 +11,7 @@ Pipeline:
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,24 @@ from app.core.logging import log, log_config_event
 from app.users.models import Inbound, User, Domain
 from app.xray.reality import ensure_keypair
 from app.xray.transports import build_stream_settings
+
+
+def _geo_files_present() -> bool:
+    """Return True only if both official geoip.dat and geosite.dat exist.
+
+    Xray-core reads these from its working directory / the default share path
+    (e.g. /usr/local/share/xray). When they are missing we OMIT the geoip/geosite
+    routing rules so the panel never crashes on `failed to open geoip.dat`.
+    """
+    candidates = [
+        Path("/usr/local/share/xray"),
+        Path(settings.data_dir) / "xray",
+        Path(os.getcwd()),
+    ]
+    for base in candidates:
+        if (base / "geoip.dat").is_file() and (base / "geosite.dat").is_file():
+            return True
+    return False
 
 
 def _build_tls(inbound: Inbound, sni_domain: str) -> dict[str, Any]:
@@ -140,8 +159,12 @@ async def build_config(db: AsyncSession) -> dict[str, Any]:
             "domainStrategy": "IPIfNonMatch",
             "rules": [
                 {"type": "field", "ip": ["geoip:private"], "outboundTag": "block"},
-                {"type": "field", "domain": ["geosite:category-ads"], "outboundTag": "block"},
-            ],
+            ]
+            + (
+                [{"type": "field", "domain": ["geosite:category-ads"], "outboundTag": "block"}]
+                if _geo_files_present()
+                else []
+            ),
         },
         "inbounds": inbounds_cfg,
         "outbounds": [

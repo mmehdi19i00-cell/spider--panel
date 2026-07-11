@@ -17,6 +17,7 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     username: str
+    csrf_token: str = ""
 
 
 class ChangeCredentials(BaseModel):

@@ -17,7 +17,7 @@ limits and traffic quotas — all wrapped in a mobile-first glassmorphism dashbo
 
 | Area | What you get |
 |------|---------------|
-| **Auth** | JWT session, password hashing (bcrypt), change username/password |
+| **Auth** | Server-side **cookie sessions** (HttpOnly, SameSite=Lax, Secure on HTTPS), bcrypt password hashing, **CSRF** double-submit protection, session expiry, change username/password |
 | **Dashboard** | Total / active / expired / disabled users, online connections, Xray status, CPU/RAM, total traffic |
 | **Users** | Create / edit / delete, reset UUID, extend expiry, traffic & IP limits, enable/disable, live sessions view |
 | **Inbounds** | VLESS **Reality** + **XHTTP** and legacy **WebSocket**; generate/regenerate Reality keys via `xray x25519` |
@@ -53,27 +53,41 @@ app/
     builder.py        # reads SAME inbound rows -> vless URIs
     validator.py      # guarantees valid subscriptions
   api/               # FastAPI routers: auth, users, dashboard, inbounds, domains, subscription, system
-  static/            # index.html + css + js (the SPA)
+  pages.py           # server-rendered page routes (multi-page): /login /dashboard /users /inbounds /domains /system /settings /xray /news /sub /logout
+  templates/         # one standalone HTML template PER page (mobile-first)
+  static/assets/css/base.css   # dark-red glassmorphism neon theme (mobile-first)
+  static/assets/js/{icons.js,app.js}  # inline SVG icon set + page bootstrap (cookie+CSRF)
   main.py            # FastAPI app + lifespan (init db, seed, write config, start xray)
   init_admin.py      # standalone admin bootstrap CLI
 tests/test_spider_panel.py  # full test suite
 ```
 
-### Data flow (single source of truth)
+### Routing & Auth (multi-page, mobile-first)
 
-```
-        ┌────────────┐
-        │  Database  │  (Inbound + User rows = truth)
-        └─────┬──────┘
-              │ read
-        ┌─────▼──────┐
-        │ Xray Builder│  app/xray/builder.py  ──► config.json ──► xray run
-        └─────┬──────┘
-              │ read SAME rows
-        ┌─────▼────────┐
-        │ Sub Builder   │  app/subscriptions/builder.py ──► vless:// URIs
-        └──────────────┘
-```
+Every route is a **separate HTML template** under `app/templates/` — login and
+dashboard never share a page.
+
+| Route | Page | Auth |
+|-------|------|------|
+| `/` | redirect → `/login` or `/dashboard` | — |
+| `/login` | Login only | public |
+| `/dashboard` `/users` `/inbounds` `/domains` `/system` `/settings` `/xray` `/news` | each page | **required** — unauthenticated users are redirected to `/login` |
+| `/sub` `/sub/{uuid}` | Subscription (public) | public |
+| `/logout` | destroy session → redirect `/login` | required |
+
+Authentication uses a **server-side cookie session** (`spider_session`, HttpOnly +
+SameSite=Lax + Secure on HTTPS). State-changing requests need a double-submit
+`X-CSRF-Token` header. Secrets (private keys, passwords, sessions) are never
+exposed in responses. Default login: **`admin` / `admin`** (change it in
+Settings → Change credentials on first run).
+
+### GeoIP safety
+
+`xray run` fails hard if `geoip.dat` / `geosite.dat` are referenced but missing.
+The builder **omits** the `geoip:` / `geosite:` routing rules when those files
+are absent, so the panel never crashes on a missing `geoip.dat`. The Dockerfile
+downloads the official `geoip.dat` + `geosite.dat` (from the v2fly project) into
+`/usr/local/share/xray/` at build time, so rules are active in production.
 
 ---
 

@@ -422,7 +422,13 @@ def test_auth_flow(tmp_db):
     r = client.post("/api/auth/token", data={"username": "admin", "password": "testpass123"})
     assert r.status_code == 200, r.text
     token = r.json()["access_token"]
-    h = {"Authorization": f"Bearer {token}"}
+    csrf = r.json().get("csrf_token", "")
+    # Browser-style mutating requests need the CSRF double-submit token.
+    h = {
+        "Authorization": f"Bearer {token}",
+        "X-CSRF-Token": csrf,
+        "X-Requested-With": "SpiderSPA",
+    }
     # protected
     r = client.get("/api/dashboard/stats", headers=h)
     assert r.status_code == 200
@@ -623,3 +629,87 @@ def test_db_url_postgres_passthrough(monkeypatch):
     d = tempfile.mkdtemp(prefix="spider_dbtest_pg_")
     s = Settings(DATA_DIR=d)
     assert s.db_url == "postgresql+asyncpg://u:p@db:5432/spider"
+
+
+# ---------------------------------------------------------------------------
+# Tests: Multi-page routing + cookie-session auth + CSRF
+# ---------------------------------------------------------------------------
+def _seed_admin_db(d):
+    import asyncio
+    from app.bootstrap import ensure_admin
+    from app.database import get_sessionmaker
+
+    async def _s():
+        await init_db()
+        async with get_sessionmaker()() as s:
+            await ensure_admin(s)
+    asyncio.run(_s())
+
+
+def test_protected_pages_redirect_when_unauthenticated(tmp_db):
+    _seed_admin_db(tmp_db)
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    c = TestClient(app)
+    for p in ("/dashboard", "/users", "/inbounds", "/domains", "/system", "/settings", "/xray", "/news"):
+        r = c.get(p, follow_redirects=False)
+        assert r.status_code in (302, 307)
+        assert (r.headers.get("location") or "").endswith("/login")
+
+
+def test_login_sets_session_cookie_and_protected_page_renders(tmp_db):
+    _seed_admin_db(tmp_db)
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    c = TestClient(app)
+    r = c.post("/api/auth/login", json={"username": "admin", "password": "testpass123"})
+    assert r.status_code == 200, r.text
+    csrf = r.json().get("csrf_token", "")
+    assert len(csrf) == 48
+    assert c.cookies.get("spider_session")
+    r2 = c.get("/dashboard")
+    assert r2.status_code == 200 and "<!DOCTYPE html>" in r2.text
+    r3 = c.get("/", follow_redirects=False)
+    assert r3.status_code == 302 and r3.headers["location"].endswith("/dashboard")
+
+
+def test_csrf_required_for_state_changing_requests(tmp_db):
+    _seed_admin_db(tmp_db)
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    c = TestClient(app)
+    tok = c.post("/api/auth/login", json={"username": "admin", "password": "testpass123"}).json()["csrf_token"]
+    h = {"X-CSRF-Token": tok, "X-Requested-With": "SpiderSPA"}
+    ok = c.post("/api/users", json={"username": "csrfuser", "expire_days": 5}, headers=h)
+    assert ok.status_code == 201, ok.text
+    bad = c.post("/api/users", json={"username": "csrfuser2", "expire_days": 5})
+    assert bad.status_code == 403
+
+
+def test_logout_clears_session(tmp_db):
+    _seed_admin_db(tmp_db)
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    c = TestClient(app)
+    tok = c.post("/api/auth/login", json={"username": "admin", "password": "testpass123"}).json()["csrf_token"]
+    r = c.post("/api/auth/logout", headers={"X-CSRF-Token": tok, "X-Requested-With": "SpiderSPA"})
+    assert r.status_code == 200
+    r2 = c.get("/dashboard", follow_redirects=False)
+    assert r2.status_code in (302, 307)
+
+
+def test_geoip_rules_omitted_when_files_absent(tmp_db):
+    import asyncio
+    from app.xray.builder import build_config
+
+    async def _g():
+        await init_db()
+        async with get_sessionmaker()() as s:
+            return await build_config(s)
+    cfg = asyncio.run(_g())
+    geosite = [ru for ru in cfg["routing"]["rules"] if "geosite:" in str(ru)]
+    assert geosite == [], "geosite rules must be omitted when geosite.dat is absent"

@@ -22,6 +22,7 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import (
     X25519PublicKey,
 )
 from fastapi import Depends, HTTPException, status
+from fastapi.requests import Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy import select
@@ -134,6 +135,7 @@ def decode_access_token(token: str) -> dict[str, Any] | None:
 
 async def get_current_admin(
     token: str | None = Depends(oauth2_scheme),
+    request: Request = None,
     db: AsyncSession = Depends(get_db),
 ) -> AdminUser:
     cred_exc = HTTPException(
@@ -141,16 +143,22 @@ async def get_current_admin(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    if not token:
-        raise cred_exc
-    payload = decode_access_token(token)
-    if payload is None or "sub" not in payload:
-        raise cred_exc
-    result = await db.execute(select(AdminUser).where(AdminUser.username == payload["sub"]))
-    admin = result.scalar_one_or_none()
-    if admin is None or not admin.is_active:
-        raise cred_exc
-    return admin
+    # 1) Cookie session (browser SPA, mobile-first pages)
+    if request is not None:
+        from app.core import session as session_mod
+
+        admin = await session_mod.current_admin_from_session(request, db)
+        if admin is not None:
+            return admin
+    # 2) Bearer JWT fallback (API clients / tests)
+    if token:
+        payload = decode_access_token(token)
+        if payload is not None and "sub" in payload:
+            result = await db.execute(select(AdminUser).where(AdminUser.username == payload["sub"]))
+            admin = result.scalar_one_or_none()
+            if admin is not None and admin.is_active:
+                return admin
+    raise cred_exc
 
 
 def require_csrf(headers: dict, form: dict | None = None) -> bool:

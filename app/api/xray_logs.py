@@ -56,12 +56,32 @@ async def xray_config(_: AdminUser = Depends(get_current_admin)):
 # ---------------------------------------------------------------------------
 @router.websocket("/logs/stream")
 async def xray_logs_stream(ws: WebSocket):
-    # Auth: token query param (dashboard passes the same JWT)
-    token = ws.query_params.get("token") or ""
-    from app.core.security import decode_access_token
+    # Auth: accept either a session cookie (browser) or a ?token= JWT.
+    from app.core import session as session_mod
+    from app.database import get_sessionmaker
+    from app.users.models import AdminUser
+    from sqlalchemy import select
 
-    payload = decode_access_token(token)
-    if not payload or "sub" not in payload:
+    token = ws.query_params.get("token") or ""
+    admin = None
+    # 1) cookie session
+    sid = ws.cookies.get(session_mod.COOKIE_NAME)
+    if sid:
+        async with get_sessionmaker()() as db:
+            sess = await session_mod.get_session(db, sid)
+            if sess is not None:
+                res = await db.execute(select(AdminUser).where(AdminUser.id == sess.admin_id))
+                admin = res.scalar_one_or_none()
+    # 2) JWT fallback
+    if admin is None and token:
+        from app.core.security import decode_access_token
+
+        payload = decode_access_token(token)
+        if payload and "sub" in payload:
+            async with get_sessionmaker()() as db:
+                res = await db.execute(select(AdminUser).where(AdminUser.username == payload["sub"]))
+                admin = res.scalar_one_or_none()
+    if admin is None:
         await ws.close(code=4401, reason="unauthorized")
         return
     await ws.accept()

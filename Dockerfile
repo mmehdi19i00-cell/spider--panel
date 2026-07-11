@@ -31,6 +31,17 @@ RUN set -eux; \
     rm -rf /tmp/xray.zip /tmp/xray-extracted; \
     /usr/local/bin/xray version
 
+# --- Download official geoip.dat + geosite.dat (Xray project rules) ---
+# Placed in the Xray share dir so routing rules that reference
+# `geoip:` / `geosite:` resolve. If these downloads fail the build still
+# succeeds (the panel builder omits geoip/geosite rules when the files are
+# absent), so the app never crashes on a missing geoip.dat.
+RUN set -eux; \
+    mkdir -p /usr/local/share/xray; \
+    wget -q https://github.com/v2fly/geoip/releases/latest/download/geoip.dat -O /usr/local/share/xray/geoip.dat || true; \
+    wget -q https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat -O /usr/local/share/xray/geosite.dat || true; \
+    ls -l /usr/local/share/xray || true
+
 # --- App deps ---
 WORKDIR /app
 COPY requirements.txt .

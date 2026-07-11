@@ -46,6 +46,24 @@ class AdminUser(Base):
 
 
 # ---------------------------------------------------------------------------
+# Server-side sessions (cookie holds only the signed session id)
+# ---------------------------------------------------------------------------
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)  # session uuid
+    admin_id: Mapped[int] = mapped_column(ForeignKey("admin_users.id", ondelete="CASCADE"), index=True)
+    csrf_token: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ip: Mapped[str] = mapped_column(String(64), default="")
+    user_agent: Mapped[str] = mapped_column(String(255), default="")
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Session {self.id}>"
+
+
+# ---------------------------------------------------------------------------
 # Inbounds — one row per enabled listening inbound (Reality / TLS / ...)
 # ---------------------------------------------------------------------------
 class Inbound(Base):

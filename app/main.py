@@ -27,6 +27,7 @@ from app.api import (
     users,
     xray_logs,
 )
+from app import pages
 from app.bootstrap import (
     ensure_admin,
     ensure_default_domain,
@@ -104,27 +105,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# CSRF defense-in-depth: state-changing requests (POST/PUT/DELETE/PATCH) that
-# carry an X-Requested-With: SpiderSPA header must also carry a valid-format
-# X-CSRF-Token. Plain API/test clients that omit both headers are unaffected.
-# This stops cross-site form/JS from issuing mutations without the SPA token.
+# CSRF defense-in-depth: for state-changing requests (POST/PUT/DELETE/PATCH)
+# issued by a logged-in browser session (session cookie present) OR carrying
+# the SPA marker header, a valid-format `X-CSRF-Token` is required. Plain API /
+# test clients that omit both the session cookie and the SPA header are
+# unaffected. This stops cross-site form/JS from issuing mutations.
 from starlette.middleware.base import BaseHTTPMiddleware
 
 class CSRFTokenMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         if request.method in ("POST", "PUT", "DELETE", "PATCH"):
-            if request.headers.get("X-Requested-With") == "SpiderSPA":
+            path = request.url.path
+            # Credential-exchange endpoints establish the session, so they are
+            # CSRF-exempt (no session exists yet to bind a token to).
+            if path.startswith("/api/auth/"):
+                return await call_next(request)
+            has_session = bool(request.cookies.get("spider_session"))
+            is_spa = request.headers.get("X-Requested-With") == "SpiderSPA"
+            if has_session or is_spa:
                 token = request.headers.get("X-CSRF-Token", "")
-                if not (len(token) == 32 and all(c in "0123456789abcdef" for c in token)):
+                if not (len(token) == 48 and all(c in "0123456789abcdef" for c in token)):
                     from fastapi import Response
+
                     return Response("CSRF token invalid", status_code=403)
         return await call_next(request)
-
 app.add_middleware(CSRFTokenMiddleware)
 
 # API routers
 for r in (auth, users, dashboard, inbounds, domains, qr, subscription, system, settings_router, news, xray_logs):
     app.include_router(r.router)
+
+# Page (multi-page) router — separate templates, auth-guarded.
+app.include_router(pages.router)
 
 
 # Static frontend
@@ -136,33 +148,6 @@ async def healthz():
     return {"status": "ok", "service": "spider-panel"}
 
 
-@app.get("/")
-async def index():
-    return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
-
-
-@app.get("/sub")
-async def sub_landing():
-    """Public subscription UI landing page (enter a UUID, or open /sub/<uuid>)."""
-    sub_html = os.path.join(_STATIC_DIR, "sub.html")
-    if os.path.isfile(sub_html):
-        return FileResponse(sub_html)
-    return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
-
-
-@app.get("/{full_path:path}")
-async def spa_fallback(full_path: str):
-    # Don't hijack /api or /sub
-    if full_path.startswith("api/") or full_path.startswith("sub/"):
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Not found")
-    file_path = os.path.join(_STATIC_DIR, full_path)
-    if os.path.isfile(file_path):
-        return FileResponse(file_path)
-    return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
-
-
 # Mount static dir for assets (css/js/img)
 if os.path.isdir(_STATIC_DIR):
     app.mount("/assets", StaticFiles(directory=os.path.join(_STATIC_DIR, "assets")), name="assets")
@@ -171,6 +156,26 @@ if os.path.isdir(_STATIC_DIR):
 _MUSICS_DIR = os.path.join(_STATIC_DIR, "musics")
 if os.path.isdir(_MUSICS_DIR):
     app.mount("/musics", StaticFiles(directory=_MUSICS_DIR), name="musics")
+
+
+@app.get("/{full_path:path}")
+async def fallback_404(full_path: str):
+    # Don't hijack /api or /assets or /musics (handled above).
+    from fastapi import HTTPException
+
+    if full_path.startswith(("api/", "assets/", "musics/", "sub/")):
+        raise HTTPException(status_code=404, detail="Not found")
+    from fastapi.responses import HTMLResponse
+
+    return HTMLResponse(
+        "<!doctype html><html><head><meta charset=utf-8>"
+        "<meta name=viewport content='width=device-width,initial-scale=1'>"
+        "<title>404</title></head><body style='background:#0a0a0c;color:#fff;"
+        "font-family:system-ui;text-align:center;padding:40px'>"
+        "<h1>404 — Not found</h1>"
+        "<a href='/dashboard' style='color:#ff2d55'>Go to dashboard</a></body></html>",
+        status_code=404,
+    )
 
 
 if __name__ == "__main__":
