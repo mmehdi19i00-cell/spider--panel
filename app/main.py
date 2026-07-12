@@ -153,6 +153,19 @@ for r in (auth, dashboard, domains, inbounds, news, qr, remote, settings_router,
 
 
 # Template routes - protected pages
+@app.get("/", response_class=HTMLResponse)
+async def root_redirect(request: Request):
+    """Root path -> dashboard if authenticated, else login."""
+    token = request.cookies.get("spider_token")
+    if token:
+        from app.core.security import decode_access_token
+
+        payload = decode_access_token(token)
+        if payload and "sub" in payload:
+            return RedirectResponse(url="/dashboard", status_code=302)
+    return RedirectResponse(url="/login", status_code=302)
+
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     """Login page - only accessible when not authenticated."""

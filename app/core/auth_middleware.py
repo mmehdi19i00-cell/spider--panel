@@ -28,6 +28,9 @@ PUBLIC_PATHS = {
     "/assets",
     "/musics",
     "/favicon.ico",
+    # Root path is handled by the app (redirects to /dashboard or /login);
+    # it must bypass the middleware so the redirect route can decide.
+    "/",
 }
 
 
