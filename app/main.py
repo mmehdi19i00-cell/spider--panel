@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Depends, HTTPException
+from fastapi import FastAPI, Request, Depends, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -128,7 +128,7 @@ class CSRFTokenMiddleware:
         if scope["type"] != "http":
             await app(scope, receive, send)
             return
-        
+
         request = Request(scope, receive)
         if request.method in ("POST", "PUT", "DELETE", "PATCH"):
             if request.headers.get("X-Requested-With") == "SpiderSPA":
@@ -144,7 +144,7 @@ class CSRFTokenMiddleware:
 templates = Jinja2Templates(directory="app/templates")
 
 # API routers
-for r in (auth, users, dashboard, inbounds, domains, qr, subscription, system, settings_router, news, xray_logs):
+for r in (auth, dashboard, domains, inbounds, news, qr, settings_router, subscription, system, users, xray_logs):
     app.include_router(r.router)
 
 
@@ -165,13 +165,24 @@ async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 
+@app.get("/logout")
+async def logout_page(request: Request, response: Response):
+    """Logout - clear session and redirect to login."""
+    # Clear session
+    request.session.clear()
+    # Clear cookie
+    from app.core.auth_middleware import clear_auth_cookie
+    clear_auth_cookie(response)
+    return RedirectResponse(url="/login", status_code=302)
+
+
 async def require_auth(request: Request) -> str:
     """Require authentication, redirect to login if not authenticated."""
     # Check session first
     user = request.session.get("user")
     if user:
         return user
-    
+
     # Check cookie
     token = request.cookies.get("spider_token")
     if token:
@@ -180,7 +191,7 @@ async def require_auth(request: Request) -> str:
         if payload and "sub" in payload:
             request.session["user"] = payload["sub"]
             return payload["sub"]
-    
+
     # Not authenticated
     # For API requests, return 401
     if request.url.path.startswith("/api/"):

@@ -140,12 +140,16 @@ async def build_config(db: AsyncSession) -> dict[str, Any]:
     # Build routing rules - only include geoip/geosite if files exist
     routing_rules = []
     
-    # Always block private IPs (doesn't require geoip.dat - it's built-in)
-    routing_rules.append({
-        "type": "field",
-        "ip": ["geoip:private"],
-        "outboundTag": "block",
-    })
+    # Check if geoip.dat exists - private IP routing requires it
+    # Actually "geoip:private" is built into Xray, but if geoip.dat is missing
+    # we should avoid ALL geoip references to be safe
+    # We'll only add the private IP rule if geoip.dat exists
+    if geoip_exists:
+        routing_rules.append({
+            "type": "field",
+            "ip": ["geoip:private"],
+            "outboundTag": "block",
+        })
     
     # Add geoip/geosite rules only if files exist
     if geosite_exists:

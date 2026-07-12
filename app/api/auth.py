@@ -18,6 +18,7 @@ from app.core.security import (
 from app.database import get_db
 from app.schemas import ChangeCredentials, TokenRequest, TokenResponse
 from app.users.models import AdminUser
+from app.core.auth_middleware import set_auth_cookie, clear_auth_cookie
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -56,25 +57,21 @@ async def _do_login(response: Response, username: str, password: str, db: AsyncS
     admin.last_login = datetime.now(timezone.utc)
     await db.commit()
     token = create_access_token(admin.username, extra={"role": "admin"})
-    
+
     # Set HttpOnly cookie for session
-    response.set_cookie(
-        key="spider_token",
-        value=token,
-        httponly=True,
-        secure=not settings.is_railway,  # Secure in production
-        samesite="lax",
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        path="/",
+    set_auth_cookie(
+        response,
+        token,
+        expires_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
     )
-    
+
     return TokenResponse(access_token=token, username=admin.username)
 
 
 @router.post("/logout")
 async def logout(response: Response):
     """Logout - clear session cookie."""
-    response.delete_cookie(key="spider_token", path="/", httponly=True, secure=not settings.is_railway, samesite="lax")
+    clear_auth_cookie(response)
     return {"ok": True, "message": "Logged out"}
 
 

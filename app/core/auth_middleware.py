@@ -17,8 +17,10 @@ from sqlalchemy import select
 # Routes that don't require authentication
 PUBLIC_PATHS = {
     "/login",
+    "/logout",
     "/api/auth/token",
     "/api/auth/login",
+    "/api/auth/logout",
     "/api/healthz",
     "/sub",
     "/static",

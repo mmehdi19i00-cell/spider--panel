@@ -3,35 +3,9 @@
 
 {% block content %}
 <div id="app-view" class="app-shell">
-  <!-- Sidebar -->
-  <aside class="sidebar glass" id="sidebar">
-    <div class="side-brand">
-      <span class="spider-mini" aria-hidden="true">
-        <svg viewBox="0 0 32 32" fill="currentColor" width="24" height="24">
-          <path d="M16 2 L6 10 L6 22 L16 30 L26 22 L26 10 Z M16 6 L22 14 L22 22 L16 28 L10 22 L10 14 Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>
-          <circle cx="16" cy="16" r="4" fill="currentColor"/>
-        </svg>
-      </span> SPIDER
-    </div>
-    <nav class="nav">
-      <a class="nav-item" data-view="dashboard"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span> Dashboard</a>
-      <a class="nav-item" data-view="users"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Users</a>
-      <a class="nav-item active" data-view="inbounds"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span> Inbounds</a>
-      <a class="nav-item" data-view="domains"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span> Domains</a>
-      <a class="nav-item" data-view="system"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span> System</a>
-      <a class="nav-item" data-view="logs"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 13h16"/><path d="M4 19h16"/></svg></span> Xray Logs</a>
-      <a class="nav-item" data-view="settings"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span> Settings</a>
-    </nav>
-    <div class="side-foot">
-      <button id="theme-toggle" class="btn btn-ghost" title="Toggle theme"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg> Theme</button>
-      <button id="logout-btn" class="btn btn-ghost danger"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Logout</button>
-    </div>
-  </aside>
-
-  <!-- Main -->
+  <!-- Main content area -->
   <main class="main">
     <header class="topbar glass">
-      <button id="menu-btn" class="btn btn-ghost only-mobile" aria-label="Menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
       <h2 id="view-title">Inbounds</h2>
       <div class="topbar-right">
         <span id="xray-status" class="pill">Xray: …</span>
@@ -43,6 +17,14 @@
       <!-- Inbounds content loads here -->
     </div>
   </main>
+
+  <!-- Floating Action Button -->
+  <button class="fab" id="fab-add-ib" aria-label="Add Inbound" title="Add Inbound">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  </button>
 </div>
 
 <!-- Modal -->
@@ -56,194 +38,127 @@
 // Inbounds view renderer
 async function renderInbounds() {
   try {
-    const inbounds = await api('/inbounds');
+    const list = await api('/inbounds');
     const root = document.getElementById('content');
     
-    const rows = inbounds.map(ib => `
+    const rows = list.map((ib) => `
       <tr>
         <td data-label="Tag">${esc(ib.tag)}</td>
-        <td data-label="Protocol">${ib.protocol}</td>
-        <td data-label="Port">${ib.port}</td>
-        <td data-label="Network">${ib.network}</td>
-        <td data-label="Security">${ib.security}</td>
+        <td data-label="Type">${ib.security} / ${ib.network}</td>
         <td data-label="Domain">${esc(ib.domain || '—')}</td>
-        <td data-label="Enabled"><span class="badge ${ib.enabled ? 'active' : 'disabled'}">${ib.enabled ? 'Active' : 'Disabled'}</span></td>
-        <td data-label="Actions">
-          <div class="row-actions">
-            <button class="btn btn-sm btn-min" data-act="edit" data-tag="${ib.tag}" title="Edit"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-            <button class="btn btn-sm btn-min" data-act="toggle" data-tag="${ib.tag}" title="Toggle">${ib.enabled ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>'}</button>
-            <button class="btn btn-sm btn-min danger" data-act="delete" data-tag="${ib.tag}" title="Delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-          </div>
-        </td>
+        <td data-label="Port">${ib.port}${ib.external_port && ib.external_port !== ib.port ? ` <span class="badge">ext:${ib.external_port}</span>` : ''}</td>
+        <td data-label="Reality">${ib.security === 'reality' ? `pbk:${esc(ib.public_key.slice(0, 10))}…` : '—'}</td>
+        <td data-label="Status"><span class="badge ${ib.enabled ? 'active' : 'disabled'}">${ib.enabled ? 'on' : 'off'}</span></td>
+        <td data-label="Actions"><div class="row-actions">
+          <button class="btn btn-sm btn-min" data-act="edit" data-id="${ib.id}" title="Edit"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="btn btn-sm btn-min" data-act="keys" data-id="${ib.id}" title="Regenerate Reality Keys"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M6 12h12"/></svg></button>
+          <button class="btn btn-sm btn-min danger" data-act="del" data-id="${ib.id}" title="Delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div></td>
       </tr>
     `).join('');
     
     root.innerHTML = `
       <div class="panel glass">
-        <div class="panel-head">
-          <h3>INBOUNDS</h3>
-          <span class="spacer"></span>
-          <button class="btn btn-primary neon btn-sm" id="add-inbound"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Inbound</button>
-        </div>
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Tag</th>
-              <th>Protocol</th>
-              <th>Port</th>
-              <th>Network</th>
-              <th>Security</th>
-              <th>Domain</th>
-              <th>Enabled</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
+        <div class="panel-head"><h3>INBOUNDS</h3><span class="spacer"></span></div>
+        <table class="table"><thead><tr><th>Tag</th><th>Type</th><th>Domain</th><th>Port</th><th>Reality</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="7" class="muted">No inbounds</td></tr>`}</tbody></table>
       </div>
     `;
     
     // Bind actions
-    document.getElementById('add-inbound').onclick = () => openInboundModal();
-    
-    root.querySelectorAll('[data-act="edit"]').forEach(btn => {
-      btn.onclick = () => openInboundModal(btn.dataset.tag);
+    root.querySelectorAll('[data-act="edit"]').forEach(b => {
+      b.onclick = () => inboundForm(Number(b.dataset.id));
     });
-    
-    root.querySelectorAll('[data-act="toggle"]').forEach(btn => {
-      btn.onclick = async () => {
+    root.querySelectorAll('[data-act="keys"]').forEach(b => {
+      b.onclick = async () => {
         try {
-          const ib = await api(`/inbounds/${btn.dataset.tag}`);
-          await api(`/inbounds/${btn.dataset.tag}`, { method: 'PUT', body: { enabled: !ib.enabled } });
-          toast(ib.enabled ? 'Inbound disabled' : 'Inbound enabled');
+          await api(`/inbounds/${b.dataset.id}/regen-keys`, { method: 'POST' });
+          toast('Reality keys regenerated');
+          renderInbounds();
+        } catch (e) { toast(e.message, 'err'); }
+      };
+    });
+    root.querySelectorAll('[data-act="del"]').forEach(b => {
+      b.onclick = async () => {
+        if (!confirm('Delete inbound?')) return;
+        try {
+          await api(`/inbounds/${b.dataset.id}`, { method: 'DELETE' });
+          toast('Deleted');
           renderInbounds();
         } catch (e) { toast(e.message, 'err'); }
       };
     });
     
-    root.querySelectorAll('[data-act="delete"]').forEach(btn => {
-      btn.onclick = async () => {
-        if (!confirm('Delete this inbound?')) return;
-        try {
-          await api(`/inbounds/${btn.dataset.tag}`, { method: 'DELETE' });
-          toast('Inbound deleted');
-          renderInbounds();
-        } catch (e) { toast(e.message, 'err'); }
-      };
-    });
+    // FAB button
+    document.getElementById('fab-add-ib').onclick = () => inboundForm(null);
     
   } catch (e) {
     document.getElementById('content').innerHTML = `<div class="panel glass"><p class="error-text">${e.message}</p></div>`;
   }
 }
 
-// Inbound modal
-function openInboundModal(tag = null) {
-  const isEdit = !!tag;
-  const modal = document.getElementById('modal');
-  const card = document.getElementById('modal-card');
-  
-  if (isEdit) {
-    api(`/inbounds/${tag}`).then(ib => {
-      card.innerHTML = buildInboundForm(ib);
-      bindInboundForm(tag);
-      modal.hidden = false;
-    }).catch(e => toast(e.message, 'err'));
-  } else {
-    card.innerHTML = buildInboundForm({});
-    bindInboundForm(null);
-    modal.hidden = false;
-  }
-}
-
-function buildInboundForm(ib) {
-  return `
-    <h3>${isEdit ? 'Edit Inbound' : 'Create Inbound'}</h3>
-    <form id="inbound-form" style="display:flex;flex-direction:column;gap:12px">
-      <div class="field">
-        <label>Tag<input type="text" name="tag" value="${esc(ib.tag || '')}" required></label>
-      </div>
-      <div class="field">
-        <label>Protocol<select name="protocol"><option value="vless" ${ib.protocol === 'vless' ? 'selected' : ''}>vless</option></select></label>
+function inboundForm(id) {
+  const isEdit = id != null;
+  openModal(`
+    <h3>${isEdit ? 'EDIT INBOUND' : 'NEW INBOUND'}</h3>
+    <form id="ib-f">
+      <div class="field-row">
+        <div class="field"><label>Tag<input name="tag" required ${isEdit ? 'disabled' : ''}></label></div>
+        <div class="field"><label>Name<input name="name"></label></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Port<input type="number" name="port" value="${ib.port || 24567}" min="1" max="65535" required></label></div>
-        <div class="field"><label>External Port<input type="number" name="external_port" value="${ib.external_port || ''}" min="1" max="65535" placeholder="Railway TCP proxy port"></label></div>
+        <div class="field"><label>Domain (per-inbound; blank=active)<input name="domain" placeholder="vpn.example.com"></label></div>
+        <div class="field"><label>External port (client)<input name="external_port" type="number" min="1" max="65535" placeholder="Railway TCP port"></label></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Network<select name="network"><option value="xhttp" ${ib.network === 'xhttp' ? 'selected' : ''}>xhttp</option><option value="ws" ${ib.network === 'ws' ? 'selected' : ''}>ws</option><option value="tcp" ${ib.network === 'tcp' ? 'selected' : ''}>tcp</option></select></label></div>
-        <div class="field"><label>Security<select name="security"><option value="reality" ${ib.security === 'reality' ? 'selected' : ''}>reality</option><option value="tls" ${ib.security === 'tls' ? 'selected' : ''}>tls</option><option value="none" ${ib.security === 'none' ? 'selected' : ''}>none</option></select></label></div>
-      </div>
-      <div class="field">
-        <label>Domain<input type="text" name="domain" value="${esc(ib.domain || '')}" placeholder="optional"></label>
-      </div>
-      <div class="field">
-        <label>Server Name (Reality SNI)<input type="text" name="server_name" value="${esc(ib.server_name || 'is1-ssl.mzstatic.com')}"></label>
-      </div>
-      <div class="field">
-        <label>Transport Path<input type="text" name="transport_path" value="${esc(ib.transport_path || '/')}"></label>
-      </div>
-      <div class="field">
-        <label>XHTTP Mode<input type="text" name="xhttp_mode" value="${esc(ib.xhttp_mode || 'auto')}"></label>
-      </div>
-      <div class="field">
-        <label>WS Host<input type="text" name="ws_host" value="${esc(ib.ws_host || '')}" placeholder="optional"></label>
-      </div>
-      <div class="field">
-        <label>Spider X<input type="text" name="spider_x" value="${esc(ib.spider_x || '/')}"></label>
+        <div class="field"><label>Internal port (bind)<input name="port" type="number" min="1" max="65535" value="8443"></label></div>
+        <div class="field"><label>Security<select name="security"><option value="reality">reality</option><option value="tls">tls</option><option value="none">none</option></select></label></div>
+        <div class="field"><label>Network<select name="network"><option value="xhttp">xhttp</option><option value="ws">ws</option><option value="tcp">tcp</option></select></label></div>
       </div>
       <div class="field-row">
-        <label class="switch">
-          <input type="checkbox" name="enabled" ${ib.enabled !== false ? 'checked' : ''}>
-          <span class="slider"></span>
-        </label>
-        <span class="k">Enabled</span>
+        <div class="field"><label>Server name (Reality dest)<input name="server_name" placeholder="target.com:443"></label></div>
+        <div class="field"><label>SpiderX<input name="spider_x" value="/"></label></div>
       </div>
-      <div class="modal-actions">
-        <button type="button" class="btn modal-close">Cancel</button>
-        <button type="submit" class="btn btn-primary neon">${isEdit ? 'Save' : 'Create'}</button>
+      <div class="field-row">
+        <div class="field"><label>Path<input name="transport_path" value="/"></label></div>
+        <div class="field"><label>WS Host (ws only)<input name="ws_host" placeholder="optional"></label></div>
       </div>
+      <div class="field"><label>Enabled<input name="enabled" value="1"></label></div>
+      <div class="modal-actions"><button type="button" class="btn btn-ghost modal-close">Cancel</button>
+        <button class="btn btn-primary neon">Save</button></div>
     </form>
-  `;
-}
-
-function bindInboundForm(tag) {
-  const modal = document.getElementById('modal');
-  const form = document.getElementById('inbound-form');
-  const isEdit = !!tag;
+  `);
   
-  modal.querySelector('.modal-close').onclick = () => { modal.hidden = true; };
+  const form = document.getElementById('ib-f');
+  if (isEdit) {
+    api(`/inbounds/${id}`).then(ib => {
+      Object.keys(ib).forEach(k => {
+        const el = form.querySelector(`[name="${k}"]`);
+        if (el) {
+          if (el.type === 'checkbox') el.checked = ib[k];
+          else if (el.type === 'select-one') el.value = ib[k];
+          else el.value = ib[k] ?? '';
+        }
+      });
+    }).catch(e => toast(e.message, 'err'));
+  }
   
+  document.querySelector('.modal-close').onclick = () => closeModal();
   form.onsubmit = async (e) => {
     e.preventDefault();
-    const fd = new FormData(form);
-    const body = {
-      tag: fd.get('tag'),
-      protocol: fd.get('protocol'),
-      port: parseInt(fd.get('port')),
-      network: fd.get('network'),
-      security: fd.get('security'),
-      domain: fd.get('domain') || null,
-      server_name: fd.get('server_name'),
-      transport_path: fd.get('transport_path'),
-      xhttp_mode: fd.get('xhttp_mode'),
-      ws_host: fd.get('ws_host') || null,
-      spider_x: fd.get('spider_x'),
-      enabled: fd.get('enabled') === 'on',
+    const f = Object.fromEntries(new FormData(form).entries());
+    const payload = {
+      name: f.name, port: Number(f.port), security: f.security, network: f.network,
+      server_name: f.server_name, spider_x: f.spider_x, transport_path: f.transport_path,
+      domain: f.domain || '', ws_host: f.ws_host, xhttp_mode: f.xhttp_mode,
+      external_port: f.external_port ? Number(f.external_port) : null,
+      enabled: f.enabled === '1',
     };
-    const extPort = fd.get('external_port');
-    if (extPort) body.external_port = parseInt(extPort);
-    
+    if (!isEdit) payload.tag = f.tag;
     try {
-      if (isEdit) {
-        await api(`/inbounds/${tag}`, { method: 'PUT', body });
-        toast('Inbound updated');
-      } else {
-        await api('/inbounds', { method: 'POST', body });
-        toast('Inbound created');
-      }
-      modal.hidden = true;
-      renderInbounds();
+      if (isEdit) await api(`/inbounds/${id}`, { method: 'PUT', body: payload });
+      else await api('/inbounds', { method: 'POST', body: payload });
+      closeModal(); toast('Saved'); renderInbounds();
     } catch (e) { toast(e.message, 'err'); }
   };
 }

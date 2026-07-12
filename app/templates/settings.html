@@ -3,35 +3,9 @@
 
 {% block content %}
 <div id="app-view" class="app-shell">
-  <!-- Sidebar -->
-  <aside class="sidebar glass" id="sidebar">
-    <div class="side-brand">
-      <span class="spider-mini" aria-hidden="true">
-        <svg viewBox="0 0 32 32" fill="currentColor" width="24" height="24">
-          <path d="M16 2 L6 10 L6 22 L16 30 L26 22 L26 10 Z M16 6 L22 14 L22 22 L16 28 L10 22 L10 14 Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>
-          <circle cx="16" cy="16" r="4" fill="currentColor"/>
-        </svg>
-      </span> SPIDER
-    </div>
-    <nav class="nav">
-      <a class="nav-item" data-view="dashboard"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span> Dashboard</a>
-      <a class="nav-item" data-view="users"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Users</a>
-      <a class="nav-item" data-view="inbounds"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span> Inbounds</a>
-      <a class="nav-item" data-view="domains"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span> Domains</a>
-      <a class="nav-item" data-view="system"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span> System</a>
-      <a class="nav-item" data-view="logs"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 13h16"/><path d="M4 19h16"/></svg></span> Xray Logs</a>
-      <a class="nav-item active" data-view="settings"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span> Settings</a>
-    </nav>
-    <div class="side-foot">
-      <button id="theme-toggle" class="btn btn-ghost" title="Toggle theme"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg> Theme</button>
-      <button id="logout-btn" class="btn btn-ghost danger"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Logout</button>
-    </div>
-  </aside>
-
-  <!-- Main -->
+  <!-- Main content area -->
   <main class="main">
     <header class="topbar glass">
-      <button id="menu-btn" class="btn btn-ghost only-mobile" aria-label="Menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
       <h2 id="view-title">Settings</h2>
       <div class="topbar-right">
         <span id="xray-status" class="pill">Xray: …</span>
@@ -56,8 +30,8 @@
 // Settings view renderer
 async function renderSettings() {
   try {
-    const settings = await api('/settings');
     const root = document.getElementById('content');
+    const s = await api('/settings');
     
     root.innerHTML = `
       <div class="panel glass">
@@ -65,154 +39,114 @@ async function renderSettings() {
         <div class="setting-row">
           <div>
             <div class="k">Admin Username</div>
-            <div class="sub">Current: ${esc(settings.admin_username)}</div>
-          </div>
-          <div class="row-actions">
-            <button class="btn btn-sm" data-act="change-user">Change</button>
+            <div class="sub">${esc(s.admin_username || 'admin')}</div>
           </div>
         </div>
         <div class="setting-row">
           <div>
-            <div class="k">Admin Password</div>
-            <div class="sub">********</div>
-          </div>
-          <div class="row-actions">
-            <button class="btn btn-sm" data-act="change-pass">Change</button>
+            <div class="k">Admin Email</div>
+            <div class="sub">${esc(s.admin_email || '(none)')}</div>
           </div>
         </div>
         <div class="setting-row">
           <div>
-            <div class="k">Xray Binary Path</div>
-            <div class="sub">${esc(settings.xray_binary_path)}</div>
-          </div>
-        </div>
-        <div class="setting-row">
-          <div>
-            <div class="k">Data Directory</div>
-            <div class="sub">${esc(settings.data_dir)}</div>
-          </div>
-        </div>
-        <div class="setting-row">
-          <div>
-            <div class="k">Database URL</div>
-            <div class="sub">${esc(settings.database_url)}</div>
-          </div>
-        </div>
-        <div class="setting-row">
-          <div>
-            <div class="k">Active Domain</div>
-            <div class="sub">${esc(settings.active_domain || 'none')}</div>
-          </div>
-        </div>
-        <div class="setting-row">
-          <div>
-            <div class="k">Xray Inbound Port</div>
-            <div class="sub">${settings.xray_inbound_port}</div>
-          </div>
-        </div>
-        <div class="setting-row">
-          <div>
-            <div class="k">Panel Port</div>
-            <div class="sub">${settings.panel_port}</div>
+            <div class="k">Xray Internal Port</div>
+            <div class="sub">${s.xray_inbound_port || 24567}</div>
           </div>
         </div>
         <div class="setting-row">
           <div>
             <div class="k">Railway TCP Proxy Port</div>
-            <div class="sub">${settings.railway_tcp_proxy_port || 'not configured'}</div>
+            <div class="sub">${s.railway_tcp_proxy_port || '(not set)'}</div>
           </div>
         </div>
         <div class="setting-row">
           <div>
-            <div class="k">Railway TCP Proxy Domain</div>
-            <div class="sub">${esc(settings.railway_tcp_proxy_domain || 'not configured')}</div>
+            <div class="k">Public Host</div>
+            <div class="sub">${s.public_host || '(auto)'}</div>
           </div>
         </div>
         <div class="setting-row">
-          <label class="switch">
-            <input type="checkbox" id="auto-restart" ${settings.auto_restart ? 'checked' : ''}>
-            <span class="slider"></span>
-          </label>
-          <span class="k">Xray Auto Restart</span>
+          <div>
+            <div class="k">Public Port</div>
+            <div class="sub">${s.public_port || '(auto)'}</div>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="k">Data Directory</div>
+            <div class="sub">${s.data_dir || '/app/data'}</div>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="k">Log Level</div>
+            <div class="sub">${s.log_level || 'INFO'}</div>
+          </div>
         </div>
       </div>
       
       <div class="panel glass" style="margin-top:16px">
-        <h3>DANGER ZONE</h3>
-        <div class="setting-row">
-          <div>
-            <div class="k">Reset Database</div>
-            <div class="sub">This will delete ALL users and reinitialize the database and create admin/admin</div>
-          </div>
-          <div class="row-actions">
-            <button class="btn btn-sm danger" data-act="reset-db">Reset</button>
-          </div>
+        <h3>CHANGE CREDENTIALS</h3>
+        <form id="cred-form" style="display:flex;flex-direction:column;gap:12px">
+          <div class="field"><label>Current Password<input type="password" name="current_password" required></label></div>
+          <div class="field"><label>New Username (optional)<input type="text" name="new_username" placeholder="leave blank to keep"></label></div>
+          <div class="field"><label>New Password (optional)<input type="password" name="new_password" placeholder="min 6 chars"></label></div>
+          <button type="submit" class="btn btn-primary neon">Update</button>
+        </form>
+      </div>
+      
+      <div class="panel glass" style="margin-top:16px">
+        <h3>XRAY CONFIG</h3>
+        <div class="row-actions" style="margin-bottom:12px">
+          <button class="btn btn-sm" id="validate-btn">✓ Validate Config</button>
+          <button class="btn btn-sm" id="reload-btn">⚡ Reload Config</button>
+          <button class="btn btn-sm" id="restart-btn">⟳ Restart Xray</button>
         </div>
+        <div id="validate-out" class="muted" style="font-size:12px;white-space:pre-wrap"></div>
       </div>
     `;
     
-    document.getElementById('change-user').onclick = () => changeCredModal('username');
-    document.getElementById('change-pass').onclick = () => changeCredModal('password');
-    
-    document.getElementById('auto-restart').onchange = async (e) => {
+    // Bind buttons
+    document.getElementById('cred-form').onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = {
+        current_password: fd.get('current_password'),
+        new_username: fd.get('new_username') || undefined,
+        new_password: fd.get('new_password') || undefined,
+      };
       try {
-        await api('/settings/auto-restart', { method: 'PUT', body: { enabled: e.target.checked } });
-        toast('Auto-restart ' + (e.target.checked ? 'enabled' : 'disabled'));
-      } catch (e) { toast(e.message, 'err'); renderSettings(); }
+        await api('/auth/change-credentials', { method: 'POST', body });
+        toast('Credentials updated');
+        e.target.reset();
+      } catch (e) { toast(e.message, 'err'); }
     };
     
-    document.querySelector('[data-act="reset-db"]').onclick = async () => {
-      if (!confirm('This will DELETE ALL DATA. Type RESET to confirm:')) return;
-      const input = prompt('Type RESET to confirm:');
-      if (input !== 'RESET') return;
+    document.getElementById('validate-btn').onclick = async () => {
+      const out = document.getElementById('validate-out');
+      out.textContent = 'Validating…';
       try {
-        await api('/system/reset-db', { method: 'POST' });
-        toast('Database reset, reloading...');
-        setTimeout(() => window.location.reload(), 2000);
-      } catch (e) { toast(e.message, 'err'); }
+        const r = await api('/xray/validate', { method: 'POST' });
+        out.className = r.ok ? 'ok' : 'error-text';
+        out.style.whiteSpace = 'pre-wrap';
+        out.textContent = r.ok ? '✓ Config valid: ' + (r.message || '') : '✗ ' + (r.message || '') + '\n' + (r.stderr || '');
+      } catch (e) { out.className = 'error-text'; out.textContent = e.message; }
+    };
+    
+    document.getElementById('reload-btn').onclick = async () => {
+      try { await api('/system/reload', { method: 'POST' }); toast('Config reloaded'); }
+      catch (e) { toast(e.message, 'err'); }
+    };
+    
+    document.getElementById('restart-btn').onclick = async () => {
+      try { await api('/system/restart', { method: 'POST' }); toast('Restarting...'); setTimeout(renderSettings, 3000); }
+      catch (e) { toast(e.message, 'err'); }
     };
     
   } catch (e) {
     document.getElementById('content').innerHTML = `<div class="panel glass"><p class="error-text">${e.message}</p></div>`;
   }
-}
-
-function changeCredModal(type) {
-  const modal = document.getElementById('modal');
-  const card = document.getElementById('modal-card');
-  
-  card.innerHTML = `
-    <h3>Change ${type === 'username' ? 'Username' : 'Password'}</h3>
-    <form id="cred-form" style="display:flex;flex-direction:column;gap:12px">
-      <div class="field">
-        <label>Current Password<input type="password" name="current_password" required></label>
-      </div>
-      ${type === 'username' ? '<div class="field"><label>New Username<input type="text" name="new_username" required autocomplete="username"></label></div>' : ''}
-      ${type === 'password' ? '<div class="field"><label>New Password<input type="password" name="new_password" required autocomplete="new-password" minlength="6"></label></div>' : ''}
-      <div class="modal-actions">
-        <button type="button" class="btn modal-close">Cancel</button>
-        <button type="submit" class="btn btn-primary neon">Change</button>
-      </div>
-    </form>
-  `;
-  
-  modal.hidden = false;
-  
-  modal.querySelector('.modal-close').onclick = () => { modal.hidden = true; };
-  
-  document.getElementById('cred-form').onsubmit = async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    try {
-      await api('/auth/change-credentials', { 
-        method: 'POST', 
-        body: Object.fromEntries(fd) 
-      });
-      toast('Credentials updated, logging out...');
-      modal.hidden = true;
-      setTimeout(() => logout(), 1500);
-    } catch (e) { toast(e.message, 'err'); }
-  };
 }
 
 window.initSettings = renderSettings;
