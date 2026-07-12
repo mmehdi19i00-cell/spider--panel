@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}Users - Spider Panel{% endblock %}
+
+{% block content %}
+<div id="app-view" class="app-shell">
+  <!-- Sidebar -->
+  <aside class="sidebar glass" id="sidebar">
+    <div class="side-brand">
+      <span class="spider-mini" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="currentColor" width="24" height="24">
+          <path d="M16 2 L6 10 L6 22 L16 30 L26 22 L26 10 Z M16 6 L22 14 L22 22 L16 28 L10 22 L10 14 Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>
+          <circle cx="16" cy="16" r="4" fill="currentColor"/>
+        </svg>
+      </span> SPIDER
+    </div>
+    <nav class="nav">
+      <a class="nav-item" data-view="dashboard"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span> Dashboard</a>
+      <a class="nav-item active" data-view="users"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Users</a>
+      <a class="nav-item" data-view="inbounds"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span> Inbounds</a>
+      <a class="nav-item" data-view="domains"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span> Domains</a>
+      <a class="nav-item" data-view="system"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span> System</a>
+      <a class="nav-item" data-view="logs"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 13h16"/><path d="M4 19h16"/></svg></span> Xray Logs</a>
+      <a class="nav-item" data-view="settings"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span> Settings</a>
+    </nav>
+    <div class="side-foot">
+      <button id="theme-toggle" class="btn btn-ghost" title="Toggle theme"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg> Theme</button>
+      <button id="logout-btn" class="btn btn-ghost danger"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Logout</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="topbar glass">
+      <button id="menu-btn" class="btn btn-ghost only-mobile" aria-label="Menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+      <h2 id="view-title">Users</h2>
+      <div class="topbar-right">
+        <span id="xray-status" class="pill">Xray: …</span>
+        <span id="me-name" class="me"></span>
+      </div>
+    </header>
+
+    <div class="content" id="content">
+      <!-- Users content loads here -->
+    </div>
+  </main>
+</div>
+
+<!-- Modal -->
+<div id="modal" class="modal-backdrop" hidden>
+  <div class="modal glass" id="modal-card"></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Users view renderer
+  async function renderUsers() {
+    try {
+      const users = await api('/users');
+      const rows = users.map(u => `
+        <tr>
+          <td data-label="User">${esc(u.username)}</td>
+          <td data-label="UUID"><code style="font-size:11px">${esc(u.uuid.slice(0, 8))}…</code></td>
+          <td data-label="Status"><span class="badge ${u.status}">${u.status}</span></td>
+          <td data-label="Expires">${fmtDate(u.expire_at)}</td>
+          <td data-label="Traffic">${fmtBytes(u.used_traffic_bytes)} / ${u.traffic_limit_bytes ? fmtBytes(u.traffic_limit_bytes) : '∞'}</td>
+          <td data-label="IP Limit">${u.ip_limit || '∞'}</td>
+          <td data-label="Actions">
+            <div class="row-actions">
+              <button class="btn btn-sm btn-min" data-act="qr" data-id="${u.id}" title="QR Code"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+              <button class="btn btn-sm btn-min" data-act="copycfg" data-id="${u.id}" title="Copy Config"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+              <button class="btn btn-sm btn-min" data-act="copysub" data-id="${u.id}" title="Copy Subscription"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+              <button class="btn btn-sm btn-min" data-act="edit" data-id="${u.id}" title="Edit"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+              <button class="btn btn-sm btn-min" data-act="reset" data-id="${u.id}" title="Reset UUID"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2" ry="2"/><path d="M12 22V12"/><path d="M8 16l4-4 4 4"/></svg></button>
+              <button class="btn btn-sm btn-min ${u.enabled ? '' : 'btn-ok'}" data-act="toggle" data-id="${u.id}" data-en="${u.enabled}" title="${u.enabled ? 'Disable' : 'Enable'}">${u.enabled ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="16" rx="2"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>'}</button>
+              <button class="btn btn-sm btn-min" data-act="sessions" data-id="${u.id}" title="Sessions"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
+              <button class="btn btn-sm btn-min btn-ghost danger" data-act="del" data-id="${u.id}" title="Delete"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      
+      const html = `
+        <div class="panel glass">
+          <div class="panel-head">
+            <h3>USERS</h3>
+            <span class="spacer"></span>
+            <input id="user-search" class="field" style="margin:0;max-width:200px;padding:8px 12px" placeholder="search…" />
+            <button class="btn btn-primary neon btn-sm" id="add-user">+ Add</button>
+          </div>
+          <table class="table"><thead><tr>
+            <th>User</th><th>UUID</th><th>Status</th><th>Expires</th><th>Traffic</th><th>IP Limit</th><th>Actions</th>
+          </tr></thead><tbody>${rows || '<tr><td colspan="7" class="muted">No users yet</td></tr>'}</tbody></table>
+        </div>
+      `;
+      
+      document.getElementById('content').innerHTML = html;
+      bindUserRows();
+      document.getElementById('add-user').onclick = () => userForm(null);
+      document.getElementById('user-search').oninput = async (e) => {
+        const q = e.target.value.trim();
+        const list = await api('/users' + (q ? `?search=${encodeURIComponent(q)}` : ''));
+        const tb = document.querySelector('tbody');
+        tb.innerHTML = list.map(userRowInner).join('') || '<tr><td colspan="7" class="muted">No users</td></tr>';
+        bindUserRows();
+      };
+    } catch (e) {
+      document.getElementById('content').innerHTML = `<div class="panel glass"><p class="error-text">${e.message}</p></div>`;
+    }
+  }
+
+  function userRowInner(u) {
+    return `<tr>
+      <td data-label="User">${esc(u.username)}</td>
+      <td data-label="UUID"><code style="font-size:11px">${esc(u.uuid.slice(0, 8))}…</code></td>
+      <td data-label="Status"><span class="badge ${u.status}">${u.status}</span></td>
+      <td data-label="Expires">${fmtDate(u.expire_at)}</td>
+      <td data-label="Traffic">${fmtBytes(u.used_traffic_bytes)} / ${u.traffic_limit_bytes ? fmtBytes(u.traffic_limit_bytes) : '∞'}</td>
+      <td data-label="IP Limit">${u.ip_limit || '∞'}</td>
+      <td data-label="Actions"><div class="row-actions">
+        <button class="btn btn-sm btn-min" data-act="qr" data-id="${u.id}" title="QR Code"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+        <button class="btn btn-sm btn-min" data-act="copycfg" data-id="${u.id}" title="Copy Config"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        <button class="btn btn-sm btn-min" data-act="copysub" data-id="${u.id}" title="Copy Subscription"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+        <button class="btn btn-sm btn-min" data-act="edit" data-id="${u.id}" title="Edit"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button class="btn btn-sm btn-min" data-act="reset" data-id="${u.id}" title="Reset UUID"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2" ry="2"/><path d="M12 22V12"/><path d="M8 16l4-4 4 4"/></svg></button>
+        <button class="btn btn-sm btn-min ${u.enabled ? '' : 'btn-ok'}" data-act="toggle" data-id="${u.id}" data-en="${u.enabled}" title="${u.enabled ? 'Disable' : 'Enable'}">${u.enabled ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="16" rx="2"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>'}</button>
+        <button class="btn btn-sm btn-min" data-act="sessions" data-id="${u.id}" title="Sessions"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
+        <button class="btn btn-sm btn-min btn-ghost danger" data-act="del" data-id="${u.id}" title="Delete"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      </div></td></tr>`;
+  }
+
+  function bindUserRows() {
+    document.querySelectorAll('[data-act]').forEach(b => {
+      b.onclick = async () => {
+        const id = b.dataset.id;
+        try {
+          if (b.dataset.act === 'qr') showUserQR(Number(id));
+          else if (b.dataset.act === 'copycfg') { const u = await api(`/users/${id}`); const d = await api(`/sub/${u.uuid}?format=json`); copyText(d.uris.join('\n'), 'Config copied'); }
+          else if (b.dataset.act === 'copysub') { const u = await api(`/users/${id}`); copyText(location.origin + '/sub/' + u.uuid, 'Subscription copied'); }
+          else if (b.dataset.act === 'edit') userForm(Number(id));
+          else if (b.dataset.act === 'reset') { await api(`/users/${id}/reset-uuid`, { method: 'POST' }); toast('UUID reset'); renderUsers(); }
+          else if (b.dataset.act === 'toggle') {
+            await api(`/users/${id}/${b.dataset.en === 'true' ? 'disable' : 'enable'}`, { method: 'POST' });
+            toast('Updated'); renderUsers();
+          } else if (b.dataset.act === 'del') {
+            if (!confirm('Delete this user?')) return;
+            await api(`/users/${id}`, { method: 'DELETE' }); toast('Deleted'); renderUsers();
+          } else if (b.dataset.act === 'sessions') showSessions(Number(id));
+        } catch (e) { toast(e.message, 'err'); }
+      };
+    });
+  }
+
+  async function showUserQR(id) {
+    const u = await api(`/users/${id}`);
+    const d = await api(`/sub/${u.uuid}?format=json`).catch(() => ({ uris: [] }));
+    const cfg = d.uris[0] || '';
+    openModal(`<h3>QR — ${esc(u.username)}</h3>
+      <div style="display:flex;justify-content:center;padding:12px">
+        <img src="/api/qr/${esc(u.uuid)}" alt="qr" style="width:240px;height:240px;background:#fff;border-radius:12px" />
+      </div>
+      <div class="field"><label>VLESS URI</label><textarea class="codebox" readonly style="min-height:90px">${esc(cfg)}</textarea></div>
+      <div class="field"><label>Subscription URL</label><input readonly value="${esc(location.origin + '/sub/' + u.uuid)}" class="codebox"></div>
+      <div class="modal-actions">
+        <button class="btn" data-c="1">Copy Config</button>
+        <button class="btn" data-s="1">Copy Sub</button>
+        <button class="btn modal-close">Close</button>
+      </div>`);
+    document.querySelector('#modal-card [data-c]').onclick = () => copyText(cfg, 'Config copied');
+    document.querySelector('#modal-card [data-s]').onclick = () => copyText(location.origin + '/sub/' + u.uuid, 'Sub copied');
+  }
+
+  function userForm(id) {
+    const isEdit = id != null;
+    openModal(`
+      <h3>${isEdit ? 'EDIT USER' : 'NEW USER'}</h3>
+      <form id="user-f">
+        ${isEdit ? '' : '<div class="field"><label>Username</label><input name="username" required></div>'}
+        <div class="field-row">
+          <div class="field"><label>Expire (days)</label><input name="expire_days" type="number" min="0" placeholder="0 = never"></div>
+          <div class="field"><label>Traffic limit (GB)</label><input name="traffic_limit_gb" type="number" min="0" step="0.1" value="0"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>IP limit (0=∞)</label><input name="ip_limit" type="number" min="0" value="0"></div>
+          <div class="field"><label>Enabled inbounds</label><input name="enabled_inbounds" placeholder="comma,separated,tags (blank=all)"></div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost modal-close">Cancel</button>
+          <button class="btn btn-primary neon">Save</button>
+        </div>
+      </form>
+    `);
+    document.getElementById('user-f').onsubmit = async (e) => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(e.target).entries());
+      const payload = {
+        expire_days: f.expire_days ? Number(f.expire_days) : null,
+        traffic_limit_gb: Number(f.traffic_limit_gb || 0),
+        ip_limit: Number(f.ip_limit || 0),
+        enabled_inbounds: f.enabled_inbounds || '',
+      };
+      try {
+        if (isEdit) await api(`/users/${id}`, { method: 'PUT', body: payload });
+        else { payload.username = f.username; await api('/users', { method: 'POST', body: payload }); }
+        closeModal(); toast('Saved'); renderUsers();
+      } catch (e) { toast(e.message, 'err'); }
+    };
+  }
+
+  async function showSessions(id) {
+    const u = await api(`/users/${id}`).catch(() => null);
+    const sessions = await api(`/users/${id}/sessions`);
+    openModal(`<h3>SESSIONS — ${esc(u ? u.username : id)}</h3>
+      <table class="table"><thead><tr><th>IP</th><th>Connected</th><th>Last seen</th></tr></thead>
+      <tbody>${sessions.map(s => `<tr><td>${esc(s.ip)}</td><td>${fmtDate(s.connected_at)}</td><td>${fmtDate(s.last_seen)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">No active sessions</td></tr>'}</tbody></table>
+      <div class="modal-actions"><button class="btn modal-close">Close</button></div>`);
+  }
+
+  window.initUsers = renderUsers;
+</script>
+{% endblock %}

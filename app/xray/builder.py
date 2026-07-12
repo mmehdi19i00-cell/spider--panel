@@ -68,6 +68,13 @@ def _build_client(user: User) -> dict[str, Any]:
     }
 
 
+def _get_geo_files_exist() -> tuple[bool, bool]:
+    """Check if geoip.dat and geosite.dat exist in the data directory."""
+    geoip_path = Path(settings.data_dir) / "geoip.dat"
+    geosite_path = Path(settings.data_dir) / "geosite.dat"
+    return geoip_path.exists(), geosite_path.exists()
+
+
 async def build_config(db: AsyncSession) -> dict[str, Any]:
     """Assemble the full Xray config from DB state."""
     # Active domain drives SNI fallback for inbounds without their own domain.
@@ -81,6 +88,9 @@ async def build_config(db: AsyncSession) -> dict[str, Any]:
     users = uresult.scalars().all()
     active_users = [u for u in users if u.is_active]
 
+    # Check for geo files
+    geoip_exists, geosite_exists = _get_geo_files_exist()
+    
     inbounds_cfg: list[dict[str, Any]] = []
     for ib in inbounds:
         # Per-inbound domain wins; else the global active domain; else localhost.
@@ -126,6 +136,24 @@ async def build_config(db: AsyncSession) -> dict[str, Any]:
             }
         )
 
+    # Build routing rules - only include geoip/geosite if files exist
+    routing_rules = []
+    
+    # Always block private IPs (doesn't require geoip.dat - it's built-in)
+    routing_rules.append({
+        "type": "field",
+        "ip": ["geoip:private"],
+        "outboundTag": "block",
+    })
+    
+    # Add geoip/geosite rules only if files exist
+    if geosite_exists:
+        routing_rules.append({
+            "type": "field",
+            "domain": ["geosite:category-ads"],
+            "outboundTag": "block",
+        })
+
     config = {
         "log": {"loglevel": "warning", "access": "", "error": ""},
         "dns": {
@@ -138,10 +166,7 @@ async def build_config(db: AsyncSession) -> dict[str, Any]:
         },
         "routing": {
             "domainStrategy": "IPIfNonMatch",
-            "rules": [
-                {"type": "field", "ip": ["geoip:private"], "outboundTag": "block"},
-                {"type": "field", "domain": ["geosite:category-ads"], "outboundTag": "block"},
-            ],
+            "rules": routing_rules,
         },
         "inbounds": inbounds_cfg,
         "outbounds": [

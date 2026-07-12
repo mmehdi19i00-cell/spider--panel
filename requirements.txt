@@ -14,6 +14,7 @@ asyncpg>=0.29.0,<1          # for PostgreSQL in production
 bcrypt>=4.1.0,<5
 python-jose[cryptography]>=3.3.0,<4
 cryptography>=42.0.0,<44
+itsdangerous>=2.1.0,<3
 
 # --- QR code generation (SVG, no native deps) ---
 qrcode>=7.4.2,<8

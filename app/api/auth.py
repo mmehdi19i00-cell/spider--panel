@@ -1,9 +1,9 @@
-"""Auth router: login (token), change username/password, logout, me."""
+"""Auth router: login (session), logout, me, change username/password."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,18 +24,25 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @router.post("/token", response_model=TokenResponse)
 async def login(
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
 ):
-    return await _do_login(form_data.username, form_data.password, db)
+    """OAuth2 compatible login, returns access token and sets session cookie."""
+    return await _do_login(response, form_data.username, form_data.password, db)
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login_json(payload: TokenRequest, db: AsyncSession = Depends(get_db)):
-    return await _do_login(payload.username, payload.password, db)
+async def login_json(
+    response: Response,
+    payload: TokenRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """JSON login, returns access token and sets session cookie."""
+    return await _do_login(response, payload.username, payload.password, db)
 
 
-async def _do_login(username: str, password: str, db: AsyncSession) -> TokenResponse:
+async def _do_login(response: Response, username: str, password: str, db: AsyncSession) -> TokenResponse:
     res = await db.execute(select(AdminUser).where(AdminUser.username == username))
     admin = res.scalar_one_or_none()
     if not admin or not verify_password(password, admin.password_hash):
@@ -49,7 +56,26 @@ async def _do_login(username: str, password: str, db: AsyncSession) -> TokenResp
     admin.last_login = datetime.now(timezone.utc)
     await db.commit()
     token = create_access_token(admin.username, extra={"role": "admin"})
+    
+    # Set HttpOnly cookie for session
+    response.set_cookie(
+        key="spider_token",
+        value=token,
+        httponly=True,
+        secure=not settings.is_railway,  # Secure in production
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+    
     return TokenResponse(access_token=token, username=admin.username)
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    """Logout - clear session cookie."""
+    response.delete_cookie(key="spider_token", path="/", httponly=True, secure=not settings.is_railway, samesite="lax")
+    return {"ok": True, "message": "Logged out"}
 
 
 @router.get("/me")

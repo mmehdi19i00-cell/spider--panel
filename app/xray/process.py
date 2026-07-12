@@ -14,7 +14,6 @@ Design goals (from the spec):
     Railway's container). The client-facing port comes from Railway's TCP
     proxy env, handled by the config/subscription builders.
 """
-
 from __future__ import annotations
 
 import asyncio
@@ -103,7 +102,7 @@ class XrayProcessManager:
         if not Path(binary).exists():
             result["error"] = f"xray binary not found at {binary}"
             result["message"] = result["error"]
-            log_xray("validate.fail", **{k: v for k, v in result.items() if k not in ("ok",)})
+            log_xray("validate.fail", **{k: v for k, v in result.items() if k != "ok"})
             return result
         if not Path(path).exists():
             result["error"] = f"config not found at {path}"
