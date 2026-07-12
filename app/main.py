@@ -22,11 +22,13 @@ from app.api import (
     inbounds,
     news,
     qr,
+    remote,
     settings as settings_router,
     subscription,
     system,
     users,
     xray_logs,
+    remote,
 )
 from app.bootstrap import (
     ensure_admin,
@@ -144,7 +146,7 @@ class CSRFTokenMiddleware:
 templates = Jinja2Templates(directory="app/templates")
 
 # API routers
-for r in (auth, dashboard, domains, inbounds, news, qr, settings_router, subscription, system, users, xray_logs):
+for r in (auth, dashboard, domains, inbounds, news, qr, remote, settings_router, subscription, system, users, xray_logs):
     app.include_router(r.router)
 
 
@@ -248,6 +250,17 @@ async def sub_landing(request: Request):
     # This is a public page, no auth required
     return templates.TemplateResponse(request=request, name="sub.html", context={})
 
+
+@app.get("/app", response_class=HTMLResponse)
+async def app_shell(request: Request, user: str = Depends(require_auth)):
+    """Single-page console shell: fixed sidebar + sections, no reload.
+
+    Reuses the existing JSON APIs and the shared api()/toast() globals from
+    base.html. Auth is enforced by require_auth (redirects to /login).
+    """
+    return templates.TemplateResponse(
+        request=request, name="app_shell.html", context={"user": user}
+    )
 
 # Health check
 @app.get("/api/healthz")

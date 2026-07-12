@@ -685,3 +685,75 @@ def test_db_url_postgres_passthrough(monkeypatch):
     d = tempfile.mkdtemp(prefix="spider_dbtest_pg_")
     s = Settings(DATA_DIR=d)
     assert s.db_url == "postgresql+asyncpg://u:p@db:5432/spider"
+
+
+# ---------------------------------------------------------------------------
+# Tests: console SPA shell (/app) + remote control API
+# ---------------------------------------------------------------------------
+def _auth_headers(tmp_db):
+    """Seed the DB and return (client, bearer_headers, token_cookie).
+
+    The /app page route is gated by require_auth (reads the spider_token
+    COOKIE); the JSON APIs use the Bearer header. A real browser has
+    both (cookie set at login + localStorage token in api()). We set both.
+    """
+    from app.main import app
+    from app.bootstrap import ensure_admin
+    import asyncio
+
+    async def _seed():
+        await init_db()
+        maker = get_sessionmaker()
+        async with maker() as s:
+            await ensure_admin(s)
+
+    asyncio.run(_seed())
+    c = TestClient(app)
+    r = c.post(
+        "/api/auth/token",
+        data={"username": "admin", "password": "testpass123"},
+    )
+    tok = r.json()["access_token"]
+    # Cookie is set by set_auth_cookie on the login response.
+    c.cookies.set("spider_token", tok)
+    return c, {"Authorization": f"Bearer {tok}"}
+
+
+def test_app_shell_requires_auth(tmp_db):
+    from app.main import app
+
+    c = TestClient(app)
+    r = c.get("/app", follow_redirects=False)
+    # Unauthenticated: AuthMiddleware returns 401 for non-html; browser gets 302.
+    assert r.status_code in (401, 302)
+
+
+def test_app_shell_renders_with_auth(tmp_db):
+    from app.main import app
+
+    c, h = _auth_headers(tmp_db)
+    r = c.get("/app")
+    assert r.status_code == 200
+    assert "sidebar-fixed" in r.text
+    assert "app_shell.js" in r.text
+
+
+def test_remote_status_and_mouse(tmp_db):
+    from app.main import app
+
+    c, h = _auth_headers(tmp_db)
+    assert c.get("/api/remote/status", headers=h).json()["mode"] == "loopback"
+    assert c.post("/api/remote/mouse/click", json={"button": "right"}, headers=h).json() == {"ok": True}
+    assert c.post("/api/remote/mouse/scroll", json={"dx": 0, "dy": 120}, headers=h).json() == {"ok": True}
+    # clipboard round-trip via server mirror
+    assert c.post("/api/remote/clipboard", json={"text": "xyz"}, headers=h).json() == {"ok": True}
+    assert c.get("/api/remote/clipboard", headers=h).json()["text"] == "xyz"
+
+
+def test_remote_rejects_unauthenticated(tmp_db):
+    from app.main import app
+
+    c = TestClient(app)
+    # No token at all -> 401
+    assert c.get("/api/remote/status").status_code == 401
+
