@@ -278,5 +278,11 @@ async function showSessions(id) {
 }
 
 window.initUsers = renderUsers;
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => renderUsers());
+} else {
+  renderUsers();
+}
+
 </script>
 {% endblock %}

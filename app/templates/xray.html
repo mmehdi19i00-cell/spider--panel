@@ -105,5 +105,11 @@ async function renderLogs() {
 }
 
 window.initLogs = renderLogs;
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => renderLogs());
+} else {
+  renderLogs();
+}
+
 </script>
 {% endblock %}

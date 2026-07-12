@@ -164,5 +164,11 @@ function inboundForm(id) {
 }
 
 window.initInbounds = renderInbounds;
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => renderInbounds());
+} else {
+  renderInbounds();
+}
+
 </script>
 {% endblock %}

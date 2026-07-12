@@ -104,5 +104,11 @@ async function renderSystem() {
 }
 
 window.initSystem = renderSystem;
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => renderSystem());
+} else {
+  renderSystem();
+}
+
 </script>
 {% endblock %}

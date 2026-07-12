@@ -103,5 +103,11 @@ async function renderDomains() {
 }
 
 window.initDomains = renderDomains;
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => renderDomains());
+} else {
+  renderDomains();
+}
+
 </script>
 {% endblock %}

@@ -150,5 +150,11 @@ async function renderSettings() {
 }
 
 window.initSettings = renderSettings;
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => renderSettings());
+} else {
+  renderSettings();
+}
+
 </script>
 {% endblock %}

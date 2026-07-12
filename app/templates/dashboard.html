@@ -112,5 +112,10 @@ async function renderDashboard() {
 }
 
 window.initDashboard = renderDashboard;
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => renderDashboard());
+} else {
+  renderDashboard();
+}
 </script>
 {% endblock %}
