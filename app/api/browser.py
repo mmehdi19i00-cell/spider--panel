@@ -26,9 +26,6 @@ import httpx
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse, Response
 
-from app.core.security import get_current_admin
-from app.users.models import AdminUser
-
 router = APIRouter(prefix="/api/browser", tags=["browser"])
 
 _MAX_BYTES = 8 * 1024 * 1024  # 8 MB cap
@@ -115,17 +112,51 @@ def _rewrite_html(html: str, base_url: str, request: Request) -> str:
     return out
 
 
+def _auth_html_error() -> HTMLResponse:
+    """Friendly HTML shown inside the iframe when auth is missing/expired.
+
+    Returning HTML (not FastAPI's default JSON 401) means the embedded browser
+    tab renders a readable message instead of raw `{"detail": ...}` JSON.
+    """
+    return HTMLResponse(
+        """<!doctype html><html data-theme="dark"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{font-family:system-ui,Segoe UI,sans-serif;background:#0f0f12;color:#ffe9ee;
+       display:grid;place-items:center;height:100vh;margin:0;padding:24px;text-align:center}
+  .card{max-width:420px;padding:28px;border:1px solid rgba(255,26,60,.4);border-radius:16px;
+        background:rgba(28,4,12,.55);box-shadow:0 0 30px rgba(255,26,60,.25)}
+  h2{color:#ff1a3c;letter-spacing:2px;margin:0 0 10px}
+  p{color:#c79aa6;line-height:1.6;margin:8px 0 18px}
+  a{display:inline-block;padding:10px 18px;border-radius:10px;background:linear-gradient(135deg,#ff1a3c,#b3001b);
+    color:#fff;text-decoration:none;font-weight:600;letter-spacing:1px}
+</style></head><body><div class="card">
+  <h2>SIGN-IN REQUIRED</h2>
+  <p>Your session has expired or you are not signed in. The embedded browser needs a valid administrator session to load pages.</p>
+  <a href="/login">Go to login</a>
+</div></body></html>""",
+        status_code=401,
+    )
+
+
 @router.get("/proxy")
 async def browser_proxy(
     request: Request,
     url: str = Query(..., description="Fully-qualified http(s) URL to load"),
-    _: AdminUser = Depends(get_current_admin),
 ):
     """Fetch ``url`` server-side and return it from the panel's origin.
 
     HTML is rewritten so links/assets stay routed through the proxy and the
     framing-blocking headers are stripped, letting the admin iframe render it.
     """
+    # Surface a friendly in-iframe message (not raw JSON) when auth is missing.
+    token = request.cookies.get("spider_token") or (
+        request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+        if request.headers.get("Authorization", "").startswith("Bearer ")
+        else None
+    )
+    if not token:
+        return _auth_html_error()
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
         return Response("Only http(s) URLs are supported", status_code=400)

@@ -10,8 +10,9 @@ from app.schemas import UserCreate, UserOut, UserUpdate
 from app.users import service
 from app.users.models import AdminUser, User
 
-router = APIRouter(prefix="/api/users", tags=["users"])
 _protected = [Depends(get_current_admin)]
+
+router = APIRouter(prefix="/api/users", tags=["users"], dependencies=_protected)
 
 
 @router.get("", response_model=list[UserOut])

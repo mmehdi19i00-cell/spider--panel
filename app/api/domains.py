@@ -12,7 +12,9 @@ from app.domains import manager as domain_manager
 from app.schemas import DomainCreate, DomainOut
 from app.users.models import AdminUser
 
-router = APIRouter(prefix="/api/domains", tags=["domains"])
+_protected = [Depends(get_current_admin)]
+
+router = APIRouter(prefix="/api/domains", tags=["domains"], dependencies=_protected)
 
 
 @router.get("", response_model=list[DomainOut])

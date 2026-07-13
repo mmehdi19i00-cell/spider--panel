@@ -808,11 +808,17 @@
     window.logout = function(expired = false) {
       localStorage.removeItem('spider_token');
       localStorage.removeItem('spider_user');
+      // On session expiry (401 from the API) the server redirects full page
+      // loads to /login, but SPA fetch() calls only see the JSON 401. Route the
+      // browser to /login so the login screen is shown instead of a dead shell.
+      if (expired) {
+        window.location.href = '/login';
+        return;
+      }
       const appView = document.getElementById('app-view');
       const loginView = document.getElementById('login-view');
       if (appView) appView.hidden = true;
       if (loginView) loginView.hidden = false;
-      if (expired) toast('Session expired, please log in', 'err');
     };
 
     // Modal

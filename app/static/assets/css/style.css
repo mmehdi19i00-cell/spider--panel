@@ -4,82 +4,99 @@
    =================================================================== */
 
 :root {
+  /* Brand (kept red neon for identity in both themes) */
   --neon: #ff1a3c;
   --neon-soft: #ff5a73;
   --neon-deep: #b3001b;
-  --bg-0: #07000a;
-  --bg-1: #0e0008;
-  --bg-2: #150010;
-  --glass: rgba(28, 4, 12, 0.55);
-  --glass-brd: rgba(255, 26, 60, 0.28);
-  --txt: #ffe9ee;
-  --txt-dim: #c79aa6;
+
+  /* ---- DARK (default) ---- */
+  --bg-0: #0f0f12;
+  --bg-1: #16161a;
+  --bg-2: #1c1c22;
+  --glass: rgba(22, 22, 26, 0.62);
+  --glass-brd: rgba(255, 26, 60, 0.22);
+  --txt: #ffffff;
+  --txt-dim: #a0a0ab;
   --ok: #2bff88;
   --warn: #ffd23f;
   --bad: #ff3b5c;
-  --radius: 16px;
+
+  /* Neon glow stays vivid in dark mode (identity), toned down in light. */
   --shadow-neon: 0 0 14px rgba(255, 26, 60, 0.55), 0 0 38px rgba(255, 26, 60, 0.22);
+  --radius: 16px;
   --font: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
   --code-bg: rgba(0, 0, 0, 0.35);
+
+  /* Spacing / touch tokens */
+  --touch: 44px;
+  --gap: 12px;
+  --pad: 14px;
 }
 
 [data-theme="light"] {
-  --neon: #e60023;
-  --neon-soft: #ff4d68;
-  --neon-deep: #a30016;
-  --bg-0: #f3eef0;
+  /* ---- LIGHT (your contrast-safe palette) ---- */
+  --bg-0: #f8f9fa;
   --bg-1: #ffffff;
-  --bg-2: #fbe9ee;
-  --glass: rgba(255, 255, 255, 0.62);
-  --glass-brd: rgba(230, 0, 35, 0.30);
-  --txt: #2a0510;
-  --txt-dim: #7a4452;
-  --shadow-neon: 0 0 12px rgba(230, 0, 35, 0.35), 0 8px 30px rgba(0,0,0,0.10);
-  --code-bg: rgba(255, 255, 255, 0.85);
+  --bg-2: #eef0f3;
+  --glass: rgba(255, 255, 255, 0.80);
+  --glass-brd: rgba(230, 0, 35, 0.18);
+  --txt: #1a1a1a;
+  --txt-dim: #6c757d;
+  --shadow-neon: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(16, 24, 40, 0.10);
+  --code-bg: #ffffff;
+}
+
+/* Toned-down glow helpers so light mode stays professional. */
+[data-theme="light"] .glass,
+[data-theme="light"] .panel,
+[data-theme="light"] .card,
+[data-theme="light"] .modal,
+[data-theme="light"] .music-bar,
+[data-theme="light"] .tg-popup {
+  box-shadow: var(--shadow-neon);
 }
 
 /* ===================== LIGHT THEME COMPONENT OVERRIDES =====================
-   The console (panel/card/nav/music/telegram/search/modal/code) reads its
-   colours from the CSS custom properties above, so most elements already flip
-   correctly. The rules below cover the few components that used hardcoded
-   dark colours or need extra contrast in light mode. Without these the toggle
-   left the panel half-dark / unreadable — that was the "broken dark mode". */
+   Most components now read colours from the CSS custom properties, so they
+   flip automatically. The rules below only pin the few spots that need
+   explicit light-mode contrast (text colours, grid, code boxes). */
 [data-theme="light"] body { color: var(--txt); }
 [data-theme="light"] .bg-grid {
-  background-image: linear-gradient(rgba(230,0,35,.08) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(230,0,35,.08) 1px, transparent 1px);
+  background-image: linear-gradient(rgba(230,0,35,.07) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(230,0,35,.07) 1px, transparent 1px);
 }
 [data-theme="light"] .codebox,
 [data-theme="light"] .news-box,
 [data-theme="light"] #logs-box {
-  background: rgba(255, 255, 255, 0.85);
-  color: #3a0a18;
-  border-color: rgba(230, 0, 35, 0.25);
+  background: var(--code-bg);
+  color: var(--txt);
+  border-color: var(--glass-brd);
 }
+[data-theme="light"] .news-title { color: var(--neon-deep); }
+[data-theme="light"] .news-text,
+[data-theme="light"] .news-meta { color: var(--txt); }
+[data-theme="light"] .news-meta { color: var(--txt-dim); }
 [data-theme="light"] .nav-item { color: var(--txt-dim); }
 [data-theme="light"] .nav-item:hover { color: var(--txt); background: rgba(230,0,35,.08); }
 [data-theme="light"] .nav-item.active {
   color: #fff;
   background: linear-gradient(135deg, rgba(230,0,35,.92), rgba(163,0,22,.85));
   border-color: rgba(230,0,35,.4);
-  text-shadow: 0 0 8px rgba(163,0,22,.6);
 }
 [data-theme="light"] .panel,
 [data-theme="light"] .card,
 [data-theme="light"] .music-bar,
 [data-theme="light"] .tg-popup,
-[data-theme="light"] .modal {
-  border-color: rgba(230, 0, 35, 0.25);
-  box-shadow: 0 8px 30px rgba(0,0,0,0.10);
-}
-[data-theme="light"] .search-pill { border-color: rgba(230,0,35,.4); color: var(--txt); }
+[data-theme="light"] .modal { border-color: var(--glass-brd); }
+[data-theme="light"] .search-pill { border-color: var(--glass-brd); color: var(--txt); }
 [data-theme="light"] .search-pill input { color: var(--txt); }
 [data-theme="light"] .switch .slider { background: rgba(230,0,35,.18); border-color: rgba(230,0,35,.3); }
 [data-theme="light"] .switch .slider::before { background: var(--txt-dim); }
-[data-theme="light"] .topbar-fixed { background: linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.4)); border-color: rgba(230,0,35,.18); }
-[data-theme="light"] .table td { border-bottom-color: rgba(230,0,35,.12); }
-[data-theme="light"] .table tr { border-color: rgba(230,0,35,.18); }
-[data-theme="light"] .skeleton-bar, [data-theme="light"] .skeleton-card { background: rgba(230,0,35,.12); }
+[data-theme="light"] .topbar-fixed { background: var(--glass); border-color: var(--glass-brd); }
+[data-theme="light"] .table td { border-bottom-color: var(--glass-brd); }
+[data-theme="light"] .table tr { border-color: var(--glass-brd); }
+[data-theme="light"] .table th { color: var(--txt-dim); }
+[data-theme="light"] .skeleton-bar, [data-theme="light"] .skeleton-card { background: rgba(230,0,35,.10); }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
@@ -155,11 +172,16 @@ body {
   cursor: pointer; border: 1px solid var(--glass-brd); color: var(--txt);
   background: rgba(255,26,60,.08); padding: 10px 16px; border-radius: 10px;
   font-weight: 600; letter-spacing: 1px; transition: .18s; font-size: 14px;
+  /* unified alignment for icon + label */
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--touch); line-height: 1.2; text-align: center;
 }
+.btn svg { width: 18px; height: 18px; flex: 0 0 auto; display: block; }
 .btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0) scale(.98); box-shadow: none; }
 .btn-primary.neon {
   background: linear-gradient(135deg, var(--neon), var(--neon-deep));
-  border: none; color: #fff; box-shadow: var(--shadow-neon); padding: 10px 16px;
+  border: none; color: #fff; box-shadow: var(--shadow-neon);
   letter-spacing: 2px;
 }
 /* Full-width only on the standalone login screen; in the console the Add buttons
@@ -168,8 +190,23 @@ body {
 .btn-primary.neon:hover { box-shadow: 0 0 22px var(--neon); }
 .btn-ghost { background: transparent; }
 .btn-ghost.danger { color: var(--bad); border-color: rgba(255,59,92,.4); }
-.btn-sm { padding: 6px 10px; font-size: 12px; }
+.btn-sm { padding: 8px 12px; font-size: 12px; min-height: 38px; letter-spacing: .5px; }
 .btn-ok { background: rgba(43,255,136,.12); border-color: rgba(43,255,136,.4); color: var(--ok); }
+
+/* ---------- touch targets (>=44px) & icon sizing ---------- */
+.icon-btn, .music-btn, .tab, .tg-link-ico, .tg-fab {
+  min-width: var(--touch); min-height: var(--touch);
+}
+.icon-btn svg, .music-btn svg { width: 20px; height: 20px; flex: 0 0 auto; }
+.nav-item svg { width: 20px; height: 20px; flex: 0 0 auto; }
+/* inputs/selects get a comfortable 44px touch height */
+.field input, .field select, .field textarea,
+.search-pill input, .addr input, .browser-chrome input {
+  min-height: var(--touch);
+}
+.switch { width: 52px; height: 30px; }
+.switch .slider::before { height: 22px; width: 22px; left: 4px; top: 3px; }
+.switch input:checked + .slider::before { transform: translateX(22px); }
 
 /* ---------- app shell ---------- */
 .app-shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
@@ -221,15 +258,18 @@ body {
 .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
 /* ---------- forms inside modal/panels ---------- */
-.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .field label { font-size: 12px; color: var(--txt-dim); letter-spacing: 1px; }
 .field input, .field select, .field textarea {
   background: rgba(0,0,0,.25); border: 1px solid var(--glass-brd); color: var(--txt);
   padding: 10px 12px; border-radius: 8px; font-size: 14px; outline: none; font-family: var(--font);
 }
-[data-theme="light"] .field input, [data-theme="light"] .field select, [data-theme="light"] .field textarea { background: rgba(255,255,255,.7); }
+[data-theme="light"] .field input, [data-theme="light"] .field select, [data-theme="light"] .field textarea { background: #fff; border-color: rgba(230,0,35,.25); }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--neon); box-shadow: 0 0 0 2px rgba(255,26,60,.22); }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+/* panel header: wrap controls (search + add button) on narrow screens */
+.panel-head, .browser-chrome { flex-wrap: wrap; }
+.panel-head .spacer { flex: 1 1 auto; }
 
 /* ---------- modal ----------
    IMPORTANT: the `hidden` attribute must win. The UA rule `[hidden]{display:none}`

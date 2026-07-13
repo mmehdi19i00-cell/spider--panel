@@ -10,7 +10,9 @@ from app.inbounds import service as ib_service
 from app.schemas import InboundCreate, InboundOut, InboundUpdate
 from app.users.models import AdminUser, Inbound
 
-router = APIRouter(prefix="/api/inbounds", tags=["inbounds"])
+_protected = [Depends(get_current_admin)]
+
+router = APIRouter(prefix="/api/inbounds", tags=["inbounds"], dependencies=_protected)
 
 
 @router.get("", response_model=list[InboundOut])

@@ -99,6 +99,33 @@ def test_login_page_renders(tmp_db):
     assert "Login - Spider Panel" in r.text
 
 
+def test_unauthenticated_api_is_blocked(tmp_db):
+    """Regression: no route may serve admin data without a valid token.
+
+    A previous bug put '/' in PUBLIC_PATHS, which made is_public_path() match
+    every path and disabled AuthMiddleware entirely, plus several routers defined
+    _protected=[Depends(get_current_admin)] but never attached it. The result was
+    GET /api/users and /api/inbounds returning 200 with full data to anonymous
+    users. This guards against that ever returning.
+    """
+    from app.main import app
+    from app.bootstrap import ensure_admin
+    import asyncio
+
+    async def _seed():
+        await init_db()
+        maker = get_sessionmaker()
+        async with maker() as s:
+            await ensure_admin(s)
+
+    asyncio.run(_seed())
+    c = TestClient(app, follow_redirects=False)
+    for path in ("/api/users", "/api/inbounds", "/api/domains", "/api/dashboard/stats",
+                 "/api/xray/config", "/settings", "/dashboard"):
+        r = c.get(path)
+        assert r.status_code in (401, 302), f"UNAUTH {path} -> {r.status_code} (must be blocked)"
+
+
 def test_authenticated_pages_render(tmp_db):
     """Dashboard SPA renders 200; legacy section routes 302-redirect into it."""
     from app.main import app
