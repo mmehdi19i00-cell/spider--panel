@@ -140,6 +140,8 @@
       <div class="card glass"><div class="k">${k}</div><div class="v">${v}</div><div class="sub">${sub||""}</div></div>`).join("")}</div>`;
   }
 
+  function subUrl(uuid) { return `${location.origin}/sub/${uuid}`; }
+
   function svgIcon(kind) {
     // small inline svg helper for buttons (24x24, stroke currentColor)
     const paths = {
@@ -152,6 +154,11 @@
       play: '<path d="M8 5v14l11-7z"/>',
       pause: '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>',
       next: '<path d="M5 4l10 8-10 8zM19 5v14"/>',
+      prev: '<path d="M19 4l-10 8 10 8zM5 5v14"/>',
+      repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/>',
+      shuffle: '<path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/>',
+      search: '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+      share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/>',
       zoomin: '<circle cx="11" cy="11" r="7"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="16" y1="16" x2="21" y2="21"/>',
       zoomout: '<circle cx="11" cy="11" r="7"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="16" y1="16" x2="21" y2="21"/>',
     };
@@ -201,7 +208,10 @@
   async function renderNews(root) {
     root.innerHTML = `<div class="panel glass"><h3>NEWS</h3>
       <div class="row-actions" style="margin-bottom:12px">
-        <input id="news-q" class="field" style="margin:0;flex:1;min-width:160px" placeholder="Search (default: Iran)">
+        <label class="search-pill" style="flex:1;min-width:160px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svgIcon("search")}</svg>
+          <input id="news-q" placeholder="Search news (default: Iran)" autocomplete="off">
+        </label>
         <button class="btn btn-sm" id="news-go">Search</button>
       </div>
       <div id="news-list" class="muted" style="font-size:13px">Loading…</div></div>`;
@@ -233,7 +243,10 @@
     root.innerHTML = `
       <div class="panel glass">
         <div class="panel-head"><h3>USERS</h3><span class="spacer"></span>
-          <input id="user-search" class="field" style="margin:0;max-width:200px" placeholder="search…">
+          <label class="search-pill" style="max-width:220px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svgIcon("search")}</svg>
+            <input id="user-search" placeholder="search users…" autocomplete="off">
+          </label>
           <button class="btn btn-primary neon btn-sm" id="add-user">${svgIcon("plus")} Add</button>
         </div>
         ${users.length ? `<div class="cards" style="margin-top:12px">${cards}</div>` : `<p class="muted" style="margin-top:12px">No users yet.</p>`}
@@ -260,9 +273,10 @@
       <div class="kv"><span>Expire</span><span>${u.expire_at ? fmtDate(u.expire_at) : "Never"}</span></div>
       <div class="kv"><span>Traffic</span><span>${fmtBytes(u.used_traffic_bytes)} / ${u.traffic_limit_bytes ? fmtBytes(u.traffic_limit_bytes) : "∞"}</span></div>
       <div class="row-actions" style="margin-top:10px;flex-wrap:wrap">
-        <button class="btn btn-sm btn-min" data-act="qr" title="QR Code">${svgIcon("qr")}</button>
-        <button class="btn btn-sm btn-min" data-act="copycfg" title="Copy Config">${svgIcon("copy")}</button>
-        <button class="btn btn-sm btn-min" data-act="copysub" title="Copy Subscription">${svgIcon("copy")}</button>
+        <button class="btn btn-sm" data-act="config" title="Show config / QR">${svgIcon("qr")} Config</button>
+        <button class="btn btn-sm" data-act="copysub" title="Copy Subscription">${svgIcon("copy")} Sub</button>
+        <button class="btn btn-sm" data-act="copycfg" title="Copy Config">${svgIcon("copy")} Copy</button>
+        <button class="btn btn-sm" data-act="share" title="Copy share link">${svgIcon("share")} Share</button>
         <button class="btn btn-sm" data-act="edit" title="Edit">${svgIcon("edit")}</button>
         <button class="btn btn-sm" data-act="reset" title="Reset UUID">${svgIcon("key")}</button>
         <button class="btn btn-sm ${u.enabled ? "" : "btn-ok"}" data-act="toggle" data-en="${u.enabled}" title="${u.enabled ? "Disable" : "Enable"}">${u.enabled ? "Disable" : "Enable"}</button>
@@ -276,9 +290,10 @@
       b.onclick = async () => {
         const id = b.dataset.id;
         try {
-          if (b.dataset.act === "qr") showUserQR(Number(id));
+          if (b.dataset.act === "config" || b.dataset.act === "qr") showUserQR(Number(id));
           else if (b.dataset.act === "copycfg") { const u = await api(`/users/${id}`); const d = await api(`/sub/${u.uuid}?format=json`); copyText(d.uris.join("\n"), "Config copied"); }
-          else if (b.dataset.act === "copysub") { const u = await api(`/users/${id}`); copyText(location.origin + "/sub/" + u.uuid, "Subscription copied"); }
+          else if (b.dataset.act === "copysub") { const u = await api(`/users/${id}`); copyText(subUrl(u.uuid), "Subscription copied"); }
+          else if (b.dataset.act === "share") { const u = await api(`/users/${id}`); copyText(subUrl(u.uuid), "Share link copied"); }
           else if (b.dataset.act === "edit") userForm(Number(id));
           else if (b.dataset.act === "reset") { await api(`/users/${id}/reset-uuid`, { method: "POST" }); toast("UUID reset"); renderUsers(); }
           else if (b.dataset.act === "toggle") { await api(`/users/${id}/${b.dataset.en === "true" ? "disable" : "enable"}`, { method: "POST" }); toast("Updated"); renderUsers(); }
@@ -487,7 +502,10 @@
         <div class="panel-head"><h3>DOMAINS</h3><span class="spacer"></span></div>
         <p class="muted" style="font-size:12px">The active domain is used for Reality SNI, TLS, and subscription links.</p>
         <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-          <input id="dom-in" class="field" style="flex:1;min-width:200px;margin:0" placeholder="example.com">
+          <label class="search-pill" style="flex:1;min-width:200px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svgIcon("search")}</svg>
+            <input id="dom-in" placeholder="example.com" autocomplete="off">
+          </label>
           <button class="btn btn-primary neon btn-sm" id="add-dom">${svgIcon("plus")} Add</button>
         </div>
         ${list.length ? `<div class="cards">${cards}</div>` : `<p class="muted">No domains yet.</p>`}
@@ -625,7 +643,7 @@
           <button class="btn btn-sm" id="logs-pause">${svgIcon("pause")} Pause</button>
           <button class="btn btn-sm" id="logs-clear">${svgIcon("trash")} Clear</button>
           <button class="btn btn-sm" id="logs-copy">${svgIcon("copy")} Copy</button>
-          <input type="text" id="logs-search" class="field" style="margin:0;max-width:200px;padding:6px 10px" placeholder="Search logs…">
+          <input type="text" id="logs-search" class="search-pill" style="margin:0;max-width:240px;padding:6px 14px" placeholder="Search logs…">
         </div>
         <p class="muted" style="font-size:12px">Live tail of xray stdout/stderr. If Xray failed to start, the exact parser error appears here.</p>
         ${last && last.error ? `<div class="error-text" style="white-space:pre-wrap;font-size:12px;margin-bottom:10px">${esc(last.error)}</div>` : ""}
@@ -808,11 +826,35 @@
     if (!a) {
       a = document.createElement("audio");
       a.id = "bg-audio";
-      a.loop = true;
+      a.loop = music.repeat || false;
       a.preload = "auto";
       document.body.appendChild(a);
+      a.addEventListener("timeupdate", () => {
+        const fill = document.getElementById("music-progress-fill");
+        if (a.duration && fill) fill.style.width = (a.currentTime / a.duration * 100) + "%";
+      });
+      a.addEventListener("ended", () => {
+        if (music.repeat) { a.currentTime = 0; a.play().catch(() => {}); }
+        else if (music.random) startMusic(true);
+        else { const nx = nextTrackName(true); startMusicName(nx); }
+      });
     }
     return a;
+  }
+  function nextTrackName(advance) {
+    if (!music.files || music.files.length === 0) return null;
+    const a = document.getElementById("bg-audio");
+    let i = a && a.dataset.file ? music.files.indexOf(a.dataset.file) : -1;
+    if (music.random) return music.files[Math.floor(Math.random() * music.files.length)];
+    if (advance) return music.files[(i + 1) % music.files.length];
+    return music.files[(i - 1 + music.files.length) % music.files.length];
+  }
+  function startMusicName(name) {
+    if (!name) return;
+    const a = ensureAudioEl();
+    a.dataset.file = name; a.src = music.prefix + encodeURIComponent(name);
+    a.volume = (music.volume || 70) / 100;
+    a.play().then(() => { setMusicBar(true, name); }).catch(() => {});
   }
   function pickTrack() {
     if (!music.files || music.files.length === 0) return null;
@@ -822,18 +864,10 @@
   }
   function startMusic(forceNext) {
     if (!music.files || music.files.length === 0) return;
-    const a = ensureAudioEl();
-    if (forceNext && a.dataset.file) {
-      const i = music.files.indexOf(a.dataset.file);
-      const nx = music.files[(i + 1) % music.files.length];
-      a.dataset.file = nx; a.src = music.prefix + encodeURIComponent(nx);
-    } else {
-      const t = pickTrack();
-      if (!t) return;
-      a.dataset.file = t; a.src = music.prefix + encodeURIComponent(t);
-    }
-    a.volume = (music.volume || 70) / 100;
-    a.play().then(() => { setMusicBar(true, a.dataset.file); }).catch(() => { /* autoplay blocked until gesture */ });
+    if (forceNext) { startMusicName(nextTrackName(true)); return; }
+    const t = pickTrack();
+    if (!t) return;
+    startMusicName(t);
   }
   function setMusicBar(playing, file) {
     const bar = document.getElementById("music-bar");
@@ -848,8 +882,12 @@
   }
   function bindMusicBar() {
     const toggle = document.getElementById("music-toggle");
+    const prev = document.getElementById("music-prev");
     const next = document.getElementById("music-next");
     const vol = document.getElementById("music-vol");
+    const shuffle = document.getElementById("music-shuffle");
+    const repeat = document.getElementById("music-repeat");
+    const progress = document.getElementById("music-progress");
     if (!toggle) return;
     toggle.onclick = () => {
       const a = document.getElementById("bg-audio");
@@ -857,13 +895,42 @@
       else if (a) { a.play().then(() => setMusicBar(true, a.dataset.file)).catch(() => {}); }
       else { startMusic(false); }
     };
+    prev.onclick = () => {
+      const a = document.getElementById("bg-audio");
+      if (a && a.dataset.file) startMusicName(nextTrackName(false));
+      else startMusic(false);
+    };
     next.onclick = () => startMusic(true);
+    shuffle.onclick = () => {
+      music.random = !music.random;
+      shuffle.classList.toggle("active", music.random);
+      shuffle.setAttribute("aria-pressed", String(music.random));
+      setMusic("music_random", music.random ? "1" : "0");
+    };
+    repeat.onclick = () => {
+      music.repeat = !music.repeat;
+      repeat.classList.toggle("active", music.repeat);
+      repeat.setAttribute("aria-pressed", String(music.repeat));
+      const a = document.getElementById("bg-audio");
+      if (a) a.loop = music.repeat;
+      setMusic("music_repeat", music.repeat ? "1" : "0");
+    };
+    if (progress) progress.onclick = (e) => {
+      const a = document.getElementById("bg-audio");
+      if (!a || !a.duration) return;
+      const r = progress.getBoundingClientRect();
+      a.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * a.duration;
+    };
     vol.oninput = (e) => { music.volume = Number(e.target.value); const a = document.getElementById("bg-audio"); if (a) a.volume = music.volume / 100; };
   }
   async function initMusic() {
-    try { const s = await api("/settings"); const m = s.music || {}; music = { enabled: m.enabled, volume: m.volume, random: m.random, track: m.track, files: m.files || [], prefix: m.prefix || "/musics/" }; } catch { return; }
+    try { const s = await api("/settings"); const m = s.music || {}; music = { enabled: m.enabled, volume: m.volume, random: m.random, repeat: m.repeat || false, track: m.track, files: m.files || [], prefix: m.prefix || "/musics/" }; } catch { return; }
     const bar = document.getElementById("music-bar");
     if (bar) { bar.hidden = false; document.getElementById("music-vol").value = music.volume || 70; }
+    const shuffle = document.getElementById("music-shuffle");
+    const repeat = document.getElementById("music-repeat");
+    if (shuffle) { shuffle.classList.toggle("active", !!music.random); shuffle.setAttribute("aria-pressed", String(!!music.random)); }
+    if (repeat) { repeat.classList.toggle("active", !!music.repeat); repeat.setAttribute("aria-pressed", String(!!music.repeat)); }
     if (music.enabled && music.files.length) {
       // Autoplay needs a user gesture in browsers. Play on first interaction.
       const kick = () => { startMusic(false); window.removeEventListener("pointerdown", kick); window.removeEventListener("keydown", kick); };

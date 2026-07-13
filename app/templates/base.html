@@ -2,7 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0a0000">
   <title>{% block title %}Spider Panel{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -479,6 +479,189 @@
       .tg-popup { width: 240px; }
     }
 
+    /* ===================== MOBILE RESPONSIVE LAYER ===================== */
+    /* Desktop layout (>=821px) is unchanged. Everything below only adjusts
+       appearance on phones/tablets — same Red Neon theme, same colors. */
+
+    /* ---- Safe area (notch / Dynamic Island) ---- */
+    .safe-top { padding-top: max(18px, env(safe-area-inset-top)); }
+    .safe-bottom { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+
+    /* ---- Cards: stack + resize + spacing ---- */
+    @media (max-width: 820px) {
+      .cards { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+      .card { padding: 14px; }
+      .card .v { font-size: 24px; }
+      .panel { padding: 16px; margin-top: 14px; }
+      .panel h3 { font-size: 14px; }
+      .grid { gap: 12px; }
+      /* Typography: reduce only on mobile */
+      body { font-size: 15px; }
+      .content { padding: 12px 10px calc(100px + env(safe-area-inset-bottom)); }
+      .console-content { padding: 14px 10px calc(120px + env(safe-area-inset-bottom)); }
+      .topbar-fixed { margin: 10px 10px 0; padding: 10px 14px; }
+      .topbar-fixed h2 { font-size: 15px; }
+      .side-name { font-size: 13px; }
+      .subtitle { font-size: 11px; letter-spacing: 2px; }
+      .title-neon { font-size: 26px; letter-spacing: 4px; }
+      .auth-card { padding: 24px 18px; }
+      .modal { padding: 18px; }
+      .codebox { font-size: 11px; }
+      .row-actions { gap: 8px; }
+    }
+
+    /* ---- SVG sizing: desktop unchanged; mobile 24-30px; tablet 30-36px ---- */
+    @media (max-width: 820px) {
+      .nav-item svg, .nav-btn svg, .icon-btn svg, .music-btn svg, .fab svg,
+      .tg-fab-ico svg, .tg-link-ico svg, .side-logo svg, .spider-logo svg,
+      .btn svg, .tab svg, .badge svg, .pill svg { width: 24px; height: 24px; }
+      .side-logo svg { width: 30px; height: 30px; }
+      .spider-logo svg { width: 56px; height: 56px; }
+      .auth-form input { font-size: 16px; } /* >=16px prevents iOS zoom-on-focus */
+    }
+    @media (min-width: 601px) and (max-width: 820px) {
+      .nav-item svg, .nav-btn svg, .icon-btn svg, .music-btn svg, .fab svg,
+      .tg-fab-ico svg, .tg-link-ico svg, .btn svg, .tab svg { width: 30px; height: 30px; }
+      .side-logo svg { width: 34px; height: 34px; }
+    }
+    @media (min-width: 821px) and (max-width: 1180px) {
+      .nav-item svg { width: 20px; height: 20px; } /* unchanged from desktop default */
+    }
+
+    /* ---- Sidebar (already off-canvas on mobile): safe area + glass + animation ---- */
+    @media (max-width: 820px) {
+      .sidebar-fixed {
+        position: fixed; z-index: 60; left: 0; top: 0; bottom: 0;
+        width: min(280px, 82vw); transform: translateX(-110%);
+        transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+        margin: 0; border-radius: 0; height: 100vh; height: 100dvh;
+        padding-top: calc(88px + env(safe-area-inset-top));
+        background: linear-gradient(180deg, rgba(20,2,12,.92), rgba(10,0,8,.95));
+        backdrop-filter: blur(18px) saturate(140%);
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        box-shadow: 8px 0 30px rgba(0,0,0,.45);
+      }
+      .console.nav-open .sidebar-fixed { transform: none; }
+      .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 55; backdrop-filter: blur(2px); }
+      .console.collapsed .sidebar-fixed { width: min(280px, 82vw); }
+      .console.collapsed .side-id, .console.collapsed .nav-label { display: revert; }
+      .console.collapsed .side-name { font-size: 13px; }
+      .nav-item { font-size: 14px; padding: 13px 14px; }
+      .nav-item svg { width: 24px; height: 24px; }
+      .side-foot { padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); }
+    }
+
+    /* ---- Hamburger + menu button polish ---- */
+    .only-mobile { display: none; }
+    @media (max-width: 820px) {
+      .only-mobile { display: inline-flex; }
+      #menu-btn { width: 40px; height: 40px; }
+      #menu-btn svg { width: 22px; height: 22px; }
+    }
+
+    /* ---- Search pill (shared) ---- */
+    .search-pill {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(0,0,0,.28); border: 1px solid var(--glass-brd);
+      border-radius: 999px; padding: 8px 14px; color: var(--txt-dim);
+      transition: border-color .2s, box-shadow .2s, background .2s;
+      min-width: 0;
+    }
+    .search-pill:focus-within {
+      border-color: var(--neon);
+      box-shadow: 0 0 0 3px rgba(255,26,60,.18), 0 0 14px rgba(255,26,60,.35);
+      background: rgba(0,0,0,.35);
+    }
+    .search-pill svg { width: 16px; height: 16px; flex: 0 0 auto; color: var(--neon-soft); }
+    .search-pill input {
+      border: none; background: transparent; outline: none; color: var(--txt);
+      font: inherit; font-size: 14px; width: 100%; min-width: 0; padding: 0;
+    }
+    .search-pill input::placeholder { color: var(--txt-dim); }
+    @media (max-width: 820px) {
+      .search-pill { width: 100%; }
+      .search-pill input { font-size: 16px; }
+    }
+
+    /* ---- Music player (bottom, clear of Telegram top button) ---- */
+    @media (max-width: 820px) {
+      .music-bar {
+        left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom));
+        width: auto; max-width: none; gap: 8px; padding: 8px 10px;
+      }
+      .music-meta { min-width: 0; }
+      .music-vol { width: 56px; }
+      .fab { bottom: calc(86px + env(safe-area-inset-bottom)); right: 12px; }
+    }
+
+    /* ---- Tables -> stacked cards on mobile (no horizontal scroll) ---- */
+    @media (max-width: 820px) {
+      .table { font-size: 12px; }
+      .table thead { display: none; }
+      .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
+      .table tr {
+        margin-bottom: 12px; border: 1px solid var(--glass-brd);
+        border-radius: 12px; overflow: hidden; background: var(--glass);
+      }
+      .table td {
+        border: none; border-bottom: 1px solid rgba(255,26,60,.08);
+        display: flex; justify-content: space-between; gap: 12px; text-align: right;
+      }
+      .table td::before {
+        content: attr(data-label); color: var(--txt-dim);
+        font-size: 11px; text-transform: uppercase; text-align: left; font-weight: 600;
+      }
+      .table td:last-child { border-bottom: none; }
+    }
+
+    /* ---- Forms / inputs responsive + keyboard behavior ---- */
+    @media (max-width: 820px) {
+      .field-row { grid-template-columns: 1fr; }
+      .field input, .field select, .field textarea { font-size: 16px; padding: 12px; }
+      .field { margin-bottom: 10px; }
+      select, input, textarea { max-width: 100%; }
+    }
+    /* Avoid layout jump when mobile keyboard opens */
+    @media (max-height: 500px) {
+      .auth-wrap { align-items: flex-start; }
+    }
+
+    /* ---- Buttons: comfortable tap targets, wrap nicely ---- */
+    @media (max-width: 820px) {
+      .btn { font-size: 13px; padding: 10px 14px; }
+      .btn-sm { padding: 9px 12px; font-size: 12px; }
+      .btn-min { min-width: 44px; min-height: 44px; }
+      .row-actions .btn, .panel-head .btn { flex: 0 0 auto; }
+    }
+
+    /* ---- Browser chrome: wrap controls cleanly on small screens ---- */
+    @media (max-width: 820px) {
+      .browser-chrome { gap: 6px; padding: 6px; }
+      .addr { min-width: 100%; order: 3; }
+      .browser-frame-wrap { height: 58vh; min-height: 300px; }
+      .tabs { max-width: 100%; overflow-x: auto; }
+      .zoom-group .zoom-level { min-width: 42px; }
+    }
+
+    /* ---- iPad / tablet fine-tune (no layout change from desktop) ---- */
+    @media (min-width: 821px) and (max-width: 1180px) {
+      .cards { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+    }
+
+    /* ---- Prevent any horizontal overflow ---- */
+    * { -webkit-tap-highlight-color: transparent; }
+    img, svg, iframe, video { max-width: 100%; }
+    @media (max-width: 820px) {
+      html, body { overflow-x: hidden; }
+      .main, .main-col, .content, .console-content, .panel, .card, .modal { max-width: 100vw; }
+    }
+
+    @media (max-width: 360px) {
+      .tg-wrap { top: 10px; }
+      .tg-fab { width: 44px; height: 44px; }
+      .tg-popup { width: 240px; }
+    }
+
     {% block extra_styles %}{% endblock %}
   </style>
   {% block extra_head %}{% endblock %}
@@ -530,6 +713,16 @@
   <div id="toast-wrap" class="toast-wrap"></div>
 
   <script>
+    // Disable double-tap-to-zoom on mobile (native pinch/scale already off via viewport meta)
+    (function () {
+      let lastTouch = 0;
+      document.addEventListener('touchend', (e) => {
+        const now = Date.now();
+        if (now - lastTouch < 320) e.preventDefault();
+        lastTouch = now;
+      }, { passive: false });
+    })();
+
     // Generate background particles
     (function() {
       const container = document.getElementById('particles');
