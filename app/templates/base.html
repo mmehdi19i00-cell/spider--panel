@@ -592,7 +592,7 @@
     // Escape HTML
     window.esc = function(str) {
       if (!str) return '';
-      return String(str).replace(/[&<>"']/g, c => ({'&':'&','<':'<','>':'>','"':'"',"'":'''}[c]));
+      return String(str).replace(/[&<>"']/g, c => ({'&':'&','<':'<','>':'>','"':'"',"'":'&apos;'}[c]));
     };
   </script>
   {% block extra_scripts %}{% endblock %}
