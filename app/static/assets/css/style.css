@@ -242,77 +242,116 @@ body {
 .switch input:checked + .slider { background: var(--neon); box-shadow: var(--shadow-neon); }
 .switch input:checked + .slider::before { transform: translateX(24px); background: #fff; }
 
-/* ---------- Telegram contact widget (floating, top-left) ---------- */
-.tg-contact {
+/* ---------- Telegram button (top-center) + contact popup ---------- */
+.tg-wrap {
   position: fixed;
-  top: 20px;
-  left: 20px;
-  z-index: 80;                 /* above sidebar/toasts, below modals */
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 85;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  width: 200px;
-  min-height: 52px;
-  padding: 12px 14px;
+}
+.tg-fab {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1px solid rgba(120, 200, 255, 0.45);
+  background: linear-gradient(145deg, #2bb7ff, #0099ff);
+  color: #fff;
   cursor: pointer;
-  text-decoration: none;
-  color: #eaf6ff;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 18px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35),
-              0 0 14px rgba(0, 153, 255, 0.30),
-              0 0 28px rgba(0, 153, 255, 0.18);
-  transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease,
-              border-color 0.3s ease, backdrop-filter 0.3s ease;
-  user-select: none;
-  -webkit-user-select: none;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35),
+              0 0 14px rgba(0, 153, 255, 0.55),
+              0 0 28px rgba(0, 153, 255, 0.30);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  animation: tgGlow 4.2s ease-in-out infinite;
+}
+.tg-fab:hover,
+.tg-fab:focus-visible {
+  transform: scale(1.08);
+  outline: none;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4),
+              0 0 22px rgba(0, 153, 255, 0.8),
+              0 0 44px rgba(0, 153, 255, 0.5);
+}
+.tg-fab[aria-expanded="true"] { animation-play-state: paused; transform: scale(1.05); }
+.tg-fab-ico, .tg-fab-ico svg { width: 26px; height: 26px; display: block; }
+.tg-fab-pulse {
+  position: absolute; inset: -4px; border-radius: 50%;
+  border: 2px solid rgba(0, 153, 255, 0.55);
+  animation: tgPulse 2.4s ease-out infinite; pointer-events: none;
+}
+@keyframes tgPulse {
+  0%   { transform: scale(0.9); opacity: 0.8; }
+  70%, 100% { transform: scale(1.5); opacity: 0; }
 }
 /* subtle blue neon glow pulse */
 @keyframes tgGlow {
-  0%, 100% { box-shadow: 0 8px 30px rgba(0,0,0,.35), 0 0 12px rgba(0,153,255,.28), 0 0 24px rgba(0,153,255,.16); }
-  50%      { box-shadow: 0 8px 30px rgba(0,0,0,.35), 0 0 18px rgba(0,153,255,.45), 0 0 36px rgba(0,153,255,.26); }
+  0%, 100% { box-shadow: 0 6px 22px rgba(0,0,0,.35), 0 0 12px rgba(0,153,255,.45), 0 0 24px rgba(0,153,255,.25); }
+  50%      { box-shadow: 0 6px 22px rgba(0,0,0,.35), 0 0 18px rgba(0,153,255,.7), 0 0 36px rgba(0,153,255,.4); }
 }
-.tg-contact { animation: tgGlow 4.2s ease-in-out infinite; }
-.tg-contact .tg-ico {
-  flex: 0 0 auto;
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: linear-gradient(145deg, #2bb7ff, #0099ff);
-  box-shadow: 0 0 10px rgba(0, 153, 255, 0.55);
-  color: #fff;
+.tg-popup {
+  position: absolute;
+  top: 66px;
+  width: 280px;
+  max-width: calc(100vw - 32px);
+  padding: 10px;
+  border-radius: 16px;
+  background: var(--glass);
+  border: 1px solid var(--glass-brd);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: var(--shadow-neon);
+  animation: tgPop 0.22s cubic-bezier(.2,.7,.2,1);
+  transform-origin: top center;
 }
-.tg-contact .tg-ico svg { width: 18px; height: 18px; display: block; }
-.tg-contact .tg-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
-.tg-contact .tg-title { font-size: 14px; font-weight: 700; letter-spacing: 0.2px; }
-.tg-contact .tg-handle { font-size: 12px; color: #7fd3ff; font-weight: 500; }
-.tg-contact:hover,
-.tg-contact:focus-visible {
-  transform: scale(1.06);
-  text-decoration: none;
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(120, 200, 255, 0.45);
-  backdrop-filter: blur(26px);
-  -webkit-backdrop-filter: blur(26px);
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.4),
-              0 0 22px rgba(0, 153, 255, 0.65),
-              0 0 44px rgba(0, 153, 255, 0.4);
-  outline: none;
+@keyframes tgPop {
+  from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
 }
-@media (max-width: 820px) {
-  .tg-contact {
-    width: 170px;
-    top: 14px;
-    left: 14px;
-    padding: 10px 12px;
-  }
-  .tg-contact .tg-title { font-size: 13px; }
-  .tg-contact .tg-handle { font-size: 11px; }
+.tg-popup[hidden] { display: none; }
+.tg-popup-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 6px 10px; font-size: 13px; letter-spacing: 1px;
+  color: var(--txt); text-transform: uppercase;
+  border-bottom: 1px solid rgba(255,26,60,.12); margin-bottom: 8px;
+}
+.tg-popup-x {
+  background: transparent; border: none; color: var(--txt-dim);
+  font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px;
+}
+.tg-popup-x:hover { color: var(--bad); }
+.tg-link {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px; border-radius: 12px; text-decoration: none;
+  color: var(--txt); transition: background 0.18s, transform 0.12s;
+}
+.tg-link:hover { background: rgba(0, 153, 255, 0.12); transform: translateX(2px); }
+.tg-link-ico {
+  flex: 0 0 auto; width: 38px; height: 38px; border-radius: 12px;
+  display: grid; place-items: center; color: #fff;
+  box-shadow: 0 0 10px rgba(0,0,0,.25);
+}
+.tg-link-ico svg { width: 22px; height: 22px; }
+.tg-dev  { background: linear-gradient(145deg, #2bb7ff, #0099ff); }
+.tg-chan { background: linear-gradient(145deg, #36c5ff, #1f8fff); }
+.tg-gh   { background: linear-gradient(145deg, #2b2b32, #111114); }
+.tg-link-txt { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.tg-link-title { font-size: 14px; font-weight: 700; }
+.tg-link-sub { font-size: 12px; color: #7fd3ff; }
+@media (max-width: 430px) {
+  .tg-wrap { top: 12px; }
+  .tg-fab { width: 48px; height: 48px; }
+  .tg-popup { width: 260px; }
+}
+@media (max-width: 360px) {
+  .tg-wrap { top: 10px; }
+  .tg-fab { width: 44px; height: 44px; }
+  .tg-popup { width: 240px; }
 }
 
 /* ---------- News box (scrollable, text only) ---------- */

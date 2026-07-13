@@ -47,6 +47,7 @@
 
   /* ---------- State ---------- */
   let current = "home";
+  const viewHistory = [];         // stack for back navigation when re-clicking active nav
   let music = { enabled: false, volume: 70, random: false, track: "", files: [], prefix: "/musics/" };
 
   /* ---------- Boot ---------- */
@@ -59,7 +60,16 @@
         ${s.kbd ? `<span class="nav-kbd">${s.kbd}</span>` : ""}
         <span class="tip">${s.label} <kbd>${s.kbd}</kbd></span>
       </button>`).join("");
-    $$(".nav-item", nav).forEach((b) => (b.onclick = () => showView(b.dataset.view)));
+    $$(".nav-item", nav).forEach((b) => (b.onclick = () => {
+      const id = b.dataset.view;
+      // Click the already-active section again = go back to the previous one.
+      if (id === current && viewHistory.length) {
+        const back = viewHistory.pop();
+        showView(back, /*fromBack*/ true);
+      } else {
+        showView(id);
+      }
+    }));
   }
 
   function bindShell() {
@@ -100,8 +110,10 @@
   }
 
   /* ---------- Router (no reload) ---------- */
-  async function showView(name) {
+  async function showView(name, fromBack = false) {
     if (!RENDERERS[name]) name = "home";
+    // Maintain back history: push the outgoing view unless we're returning from a back.
+    if (name !== current && !fromBack) viewHistory.push(current);
     current = name;
     $$(".nav-item").forEach((n) => n.classList.toggle("active", n.dataset.view === name));
     const sec = SECTIONS.find((s) => s.id === name);
@@ -140,6 +152,8 @@
       play: '<path d="M8 5v14l11-7z"/>',
       pause: '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>',
       next: '<path d="M5 4l10 8-10 8zM19 5v14"/>',
+      zoomin: '<circle cx="11" cy="11" r="7"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="16" y1="16" x2="21" y2="21"/>',
+      zoomout: '<circle cx="11" cy="11" r="7"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="16" y1="16" x2="21" y2="21"/>',
     };
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths[kind]||""}</svg>`;
   }
@@ -519,6 +533,11 @@
           <div class="addr"><input id="b-addr" placeholder="Search Google or type a URL" aria-label="Address or search" autocomplete="off">
             <button class="btn btn-sm" id="b-go">Go</button></div>
           <button class="icon-btn" id="b-newtab" title="New tab" aria-label="New tab">${svgIcon("plus")}</button>
+          <span class="zoom-group" role="group" aria-label="Zoom">
+            <button class="icon-btn" id="b-zoom-out" title="Zoom out" aria-label="Zoom out">${svgIcon("zoomout")}</button>
+            <button class="icon-btn zoom-level" id="b-zoom-reset" title="Reset zoom" aria-label="Reset zoom">100%</button>
+            <button class="icon-btn" id="b-zoom-in" title="Zoom in" aria-label="Zoom in">${svgIcon("zoomin")}</button>
+          </span>
         </div>
         <div class="browser-frame-wrap">
           <div class="browser-loading" id="b-load"></div>
@@ -531,6 +550,15 @@
     const frame = $("#b-frame");
     const addr = $("#b-addr");
     let zoom = 1;
+    const applyZoom = () => {
+      frame.style.transform = `scale(${zoom})`;
+      frame.style.transformOrigin = "0 0";
+      // Keep the scaled frame from overflowing its container weirdly.
+      frame.style.width = `${100 / zoom}%`;
+      frame.style.height = `${100 / zoom}%`;
+      const zl = root.querySelector("#b-zoom-reset");
+      if (zl) zl.textContent = Math.round(zoom * 100) + "%";
+    };
     const load = (url) => {
       if (!url) return;
       $("#b-load").classList.add("on");
@@ -545,6 +573,10 @@
     $("#b-back").onclick = () => { try { frame.contentWindow.history.back(); } catch { toast("Back not available in iframe mode", "err"); } };
     $("#b-fwd").onclick = () => { try { frame.contentWindow.history.forward(); } catch { toast("Forward not available in iframe mode", "err"); } };
     $("#b-newtab").onclick = () => { addChromeTab("https://www.google.com"); load(chromeActive.url); };
+    const setZoom = (z) => { zoom = Math.min(3, Math.max(0.25, Math.round(z * 100) / 100)); applyZoom(); };
+    $("#b-zoom-in").onclick = () => setZoom(zoom + 0.1);
+    $("#b-zoom-out").onclick = () => setZoom(zoom - 0.1);
+    $("#b-zoom-reset").onclick = () => setZoom(1);
     load(chromeActive.url);
   }
   function normalizeUrl(input) {
@@ -840,10 +872,26 @@
     }
   }
 
+  function bindTelegramPopup() {
+    const fab = document.getElementById("tg-fab");
+    const popup = document.getElementById("tg-popup");
+    const x = document.getElementById("tg-popup-x");
+    if (!fab || !popup) return;
+    const open = () => { popup.hidden = false; fab.setAttribute("aria-expanded", "true"); };
+    const close = () => { popup.hidden = true; fab.setAttribute("aria-expanded", "false"); };
+    fab.onclick = () => { popup.hidden ? open() : close(); };
+    if (x) x.onclick = (e) => { e.stopPropagation(); close(); };
+    document.addEventListener("click", (e) => {
+      if (!popup.hidden && !popup.contains(e.target) && e.target !== fab && !fab.contains(e.target)) close();
+    });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  }
+
   /* ---------- Init ---------- */
   buildNav();
   bindShell();
   bindMusicBar();
+  bindTelegramPopup();
   initMusic();
   // Determine initial section from ?tab= (legacy redirect support) or default home.
   const params = new URLSearchParams(location.search);

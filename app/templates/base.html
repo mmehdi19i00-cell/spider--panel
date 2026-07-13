@@ -233,76 +233,115 @@
     .auth-form input:focus { border-color: var(--neon); box-shadow: 0 0 0 2px rgba(255,26,60,.25); }
     .error-text { color: var(--bad); font-size: 13px; margin: 0; }
 
-    /* Telegram contact widget (floating, top-left) */
-    .tg-contact {
+    /* Telegram button (top-center) + contact popup */
+    .tg-wrap {
       position: fixed;
-      top: 20px;
-      left: 20px;
-      z-index: 80;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 85;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 12px;
-      width: 200px;
-      min-height: 52px;
-      padding: 12px 14px;
+    }
+    .tg-fab {
+      position: relative;
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      border: 1px solid rgba(120, 200, 255, 0.45);
+      background: linear-gradient(145deg, #2bb7ff, #0099ff);
+      color: #fff;
       cursor: pointer;
-      text-decoration: none;
-      color: #eaf6ff;
-      background: rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 18px;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35),
-                  0 0 14px rgba(0, 153, 255, 0.30),
-                  0 0 28px rgba(0, 153, 255, 0.18);
-      transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease,
-                  border-color 0.3s ease, backdrop-filter 0.3s ease;
-      user-select: none;
-      -webkit-user-select: none;
-      animation: tgGlow 4.2s ease-in-out infinite;
-    }
-    @keyframes tgGlow {
-      0%, 100% { box-shadow: 0 8px 30px rgba(0,0,0,.35), 0 0 12px rgba(0,153,255,.28), 0 0 24px rgba(0,153,255,.16); }
-      50%      { box-shadow: 0 8px 30px rgba(0,0,0,.35), 0 0 18px rgba(0,153,255,.45), 0 0 36px rgba(0,153,255,.26); }
-    }
-    .tg-contact .tg-ico {
-      flex: 0 0 auto;
-      width: 30px;
-      height: 30px;
       display: grid;
       place-items: center;
-      border-radius: 50%;
-      background: linear-gradient(145deg, #2bb7ff, #0099ff);
-      box-shadow: 0 0 10px rgba(0, 153, 255, 0.55);
-      color: #fff;
+      box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35),
+                  0 0 14px rgba(0, 153, 255, 0.55),
+                  0 0 28px rgba(0, 153, 255, 0.30);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      animation: tgGlow 4.2s ease-in-out infinite;
     }
-    .tg-contact .tg-ico svg { width: 18px; height: 18px; display: block; }
-    .tg-contact .tg-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
-    .tg-contact .tg-title { font-size: 14px; font-weight: 700; letter-spacing: 0.2px; }
-    .tg-contact .tg-handle { font-size: 12px; color: #7fd3ff; font-weight: 500; }
-    .tg-contact:hover,
-    .tg-contact:focus-visible {
-      transform: scale(1.06);
-      text-decoration: none;
-      background: rgba(255, 255, 255, 0.12);
-      border-color: rgba(120, 200, 255, 0.45);
-      backdrop-filter: blur(26px);
-      -webkit-backdrop-filter: blur(26px);
-      box-shadow: 0 10px 36px rgba(0, 0, 0, 0.4),
-                  0 0 22px rgba(0, 153, 255, 0.65),
-                  0 0 44px rgba(0, 153, 255, 0.4);
+    .tg-fab:hover,
+    .tg-fab:focus-visible {
+      transform: scale(1.08);
       outline: none;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4),
+                  0 0 22px rgba(0, 153, 255, 0.8),
+                  0 0 44px rgba(0, 153, 255, 0.5);
     }
+    .tg-fab[aria-expanded="true"] { animation-play-state: paused; transform: scale(1.05); }
+    .tg-fab-ico { width: 26px; height: 26px; display: block; }
+    .tg-fab-ico svg { width: 26px; height: 26px; display: block; }
+    .tg-fab-pulse {
+      position: absolute; inset: -4px; border-radius: 50%;
+      border: 2px solid rgba(0, 153, 255, 0.55);
+      animation: tgPulse 2.4s ease-out infinite;
+      pointer-events: none;
+    }
+    @keyframes tgPulse {
+      0%   { transform: scale(0.9); opacity: 0.8; }
+      70%  { transform: scale(1.5); opacity: 0; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+    @keyframes tgGlow {
+      0%, 100% { box-shadow: 0 6px 22px rgba(0,0,0,.35), 0 0 12px rgba(0,153,255,.45), 0 0 24px rgba(0,153,255,.25); }
+      50%      { box-shadow: 0 6px 22px rgba(0,0,0,.35), 0 0 18px rgba(0,153,255,.7), 0 0 36px rgba(0,153,255,.4); }
+    }
+
+    .tg-popup {
+      position: absolute;
+      top: 66px;
+      width: 280px;
+      max-width: calc(100vw - 32px);
+      padding: 10px;
+      border-radius: 16px;
+      background: var(--glass);
+      border: 1px solid var(--glass-brd);
+      backdrop-filter: blur(16px) saturate(140%);
+      -webkit-backdrop-filter: blur(16px) saturate(140%);
+      box-shadow: var(--shadow-neon);
+      animation: tgPop 0.22s cubic-bezier(.2,.7,.2,1);
+      transform-origin: top center;
+    }
+    @keyframes tgPop {
+      from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+      to   { opacity: 1; transform: none; }
+    }
+    .tg-popup[hidden] { display: none; }
+    .tg-popup-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 6px 10px; font-size: 13px; letter-spacing: 1px;
+      color: var(--txt); text-transform: uppercase;
+      border-bottom: 1px solid rgba(255,26,60,.12); margin-bottom: 8px;
+    }
+    .tg-popup-x {
+      background: transparent; border: none; color: var(--txt-dim);
+      font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px;
+    }
+    .tg-popup-x:hover { color: var(--bad); }
+    .tg-link {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px; border-radius: 12px; text-decoration: none;
+      color: var(--txt); transition: background 0.18s, transform 0.12s;
+    }
+    .tg-link:hover { background: rgba(0, 153, 255, 0.12); transform: translateX(2px); }
+    .tg-link-ico {
+      flex: 0 0 auto; width: 38px; height: 38px; border-radius: 12px;
+      display: grid; place-items: center; color: #fff;
+      box-shadow: 0 0 10px rgba(0,0,0,.25);
+    }
+    .tg-link-ico svg { width: 22px; height: 22px; }
+    .tg-dev  { background: linear-gradient(145deg, #2bb7ff, #0099ff); }
+    .tg-chan { background: linear-gradient(145deg, #36c5ff, #1f8fff); }
+    .tg-gh   { background: linear-gradient(145deg, #2b2b32, #111114); }
+    .tg-link-txt { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+    .tg-link-title { font-size: 14px; font-weight: 700; }
+    .tg-link-sub { font-size: 12px; color: #7fd3ff; }
+
     @media (max-width: 430px) {
-      .tg-contact {
-        width: 160px;
-        top: 14px;
-        left: 14px;
-        padding: 10px 12px;
-      }
-      .tg-contact .tg-title { font-size: 13px; }
-      .tg-contact .tg-handle { font-size: 11px; }
+      .tg-wrap { top: 12px; }
+      .tg-fab { width: 48px; height: 48px; }
+      .tg-popup { width: 260px; }
     }
 
     /* Mobile-first app shell */
@@ -435,9 +474,9 @@
 
     /* Extra small mobile */
     @media (max-width: 360px) {
-      .tg-contact { width: 140px; top: 12px; left: 12px; }
-      .tg-contact .tg-title { font-size: 12px; }
-      .tg-contact .tg-handle { font-size: 10px; }
+      .tg-wrap { top: 10px; }
+      .tg-fab { width: 44px; height: 44px; }
+      .tg-popup { width: 240px; }
     }
 
     {% block extra_styles %}{% endblock %}
@@ -450,18 +489,40 @@
   <div class="bg-glow" aria-hidden="true"></div>
   <div class="bg-particles" id="particles" aria-hidden="true"></div>
 
-  <!-- Floating Telegram Contact Button -->
-  <a class="tg-contact" href="https://t.me/amirsplder" target="_blank" rel="noopener noreferrer" aria-label="Contact me on Telegram: @amirsplder">
-    <span class="tg-ico" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l10.66-4.12c.73-.33 1.43.18 1.15 1.3l-2.32 10.94c-.21 1.02-.85 1.27-1.73.78l-3.46-2.55-1.57 1.51c-.17.17-.31.31-.62.31z"/>
-      </svg>
-    </span>
-    <span class="tg-text">
-      <span class="tg-title">Contact Me</span>
-      <span class="tg-handle">@amirsplder</span>
-    </span>
-  </a>
+  <!-- Floating Telegram button (top-center) + contact popup -->
+  <div class="tg-wrap" id="tg-wrap">
+    <button class="tg-fab" id="tg-fab" aria-expanded="false" aria-controls="tg-popup" title="Open contact links">
+      <span class="tg-fab-ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l10.66-4.12c.73-.33 1.43.18 1.15 1.3l-2.32 10.94c-.21 1.02-.85 1.27-1.73.78l-3.46-2.55-1.57 1.51c-.17.17-.31.31-.62.31z"/></svg>
+      </span>
+      <span class="tg-fab-pulse" aria-hidden="true"></span>
+    </button>
+
+    <div class="tg-popup glass" id="tg-popup" role="dialog" aria-label="Contact links" hidden>
+      <div class="tg-popup-head">
+        <span>Connect with us</span>
+        <button class="tg-popup-x" id="tg-popup-x" aria-label="Close">&times;</button>
+      </div>
+      <a class="tg-link" href="https://t.me/amirsplder" target="_blank" rel="noopener noreferrer">
+        <span class="tg-link-ico tg-dev" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l10.66-4.12c.73-.33 1.43.18 1.15 1.3l-2.32 10.94c-.21 1.02-.85 1.27-1.73.78l-3.46-2.55-1.57 1.51c-.17.17-.31.31-.62.31z"/></svg>
+        </span>
+        <span class="tg-link-txt"><span class="tg-link-title">Telegram Developer</span><span class="tg-link-sub">@amirsplder</span></span>
+      </a>
+      <a class="tg-link" href="https://t.me/spider_vpn1" target="_blank" rel="noopener noreferrer">
+        <span class="tg-link-ico tg-chan" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l10.66-4.12c.73-.33 1.43.18 1.15 1.3l-2.32 10.94c-.21 1.02-.85 1.27-1.73.78l-3.46-2.55-1.57 1.51c-.17.17-.31.31-.62.31z"/></svg>
+        </span>
+        <span class="tg-link-txt"><span class="tg-link-title">Telegram Channel</span><span class="tg-link-sub">@spider_vpn1</span></span>
+      </a>
+      <a class="tg-link" href="https://github.com/amirappleidfd-stack" target="_blank" rel="noopener noreferrer">
+        <span class="tg-link-ico tg-gh" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.5a10.5 10.5 0 00-3.32 20.46c.53.1.72-.23.72-.5l-.01-1.77c-2.92.63-3.54-1.41-3.54-1.41-.48-1.22-1.17-1.54-1.17-1.54-.95-.65.07-.64.07-.64 1.06.07 1.62 1.09 1.62 1.09.94 1.61 2.47 1.15 3.07.88.1-.68.37-1.15.67-1.41-2.33-.27-4.78-1.17-4.78-5.18 0-1.15.41-2.08 1.09-2.82-.11-.27-.47-1.34.1-2.79 0 0 .89-.29 2.92 1.08a10.1 10.1 0 015.32 0c2.03-1.37 2.92-1.08 2.92-1.08.57 1.45.21 2.52.1 2.79.68.74 1.09 1.67 1.09 2.82 0 4.02-2.46 4.9-4.8 5.16.38.33.71.97.71 1.96l-.01 2.9c0 .28.19.61.73.5A10.5 10.5 0 0012 1.5z"/></svg>
+        </span>
+        <span class="tg-link-txt"><span class="tg-link-title">GitHub</span><span class="tg-link-sub">amirappleidfd-stack</span></span>
+      </a>
+    </div>
+  </div>
 
   {% block content %}{% endblock %}
 

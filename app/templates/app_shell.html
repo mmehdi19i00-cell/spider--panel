@@ -84,7 +84,7 @@
     backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%);
     transition: width .26s cubic-bezier(.4,0,.2,1), transform .26s cubic-bezier(.4,0,.2,1);
     overflow: hidden; z-index: 50;
-    /* push brand below the floating Telegram button (top:20 / left:20, z:80) */
+    /* the brand is pushed down so it clears the sticky topbar (top:12) */
     padding-top: 88px;
   }
   .console.collapsed .sidebar-fixed { width: 76px; }
@@ -161,6 +161,8 @@
   .addr input { flex: 1; }
   .browser-frame-wrap { position: relative; border: 1px solid var(--glass-brd); border-top: none; border-radius: 0 0 12px 12px; overflow: hidden; background: #fff; height: 62vh; min-height: 380px; }
   .browser-frame { width: 100%; height: 100%; border: 0; display: block; }
+  .zoom-group { display: inline-flex; align-items: center; gap: 2px; }
+  .zoom-level { font-size: 11px; font-family: ui-monospace, monospace; min-width: 46px; color: var(--txt-dim); }
   .browser-loading { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--neon), transparent); background-size: 40% 100%; background-repeat: no-repeat; animation: load 1s infinite; display: none; }
   .browser-loading.on { display: block; }
   @keyframes load { 0% { background-position: -40% 0; } 100% { background-position: 140% 0; } }
