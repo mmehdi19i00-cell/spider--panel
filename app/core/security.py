@@ -21,7 +21,7 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import (
     X25519PrivateKey,
     X25519PublicKey,
 )
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy import select
@@ -133,6 +133,7 @@ def decode_access_token(token: str) -> dict[str, Any] | None:
 
 
 async def get_current_admin(
+    request: Request,
     token: str | None = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> AdminUser:
@@ -141,6 +142,14 @@ async def get_current_admin(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    # Token precedence: Authorization Bearer header > request.state.token
+    # (set by AuthMiddleware from the HttpOnly cookie) > cookie directly.
+    # This lets both API clients (Bearer) and the SPA (session cookie) use
+    # the same protected routes — previously cookie-auth silently 401'd.
+    if not token:
+        token = getattr(request.state, "token", None)
+    if not token:
+        token = request.cookies.get("spider_token")
     if not token:
         raise cred_exc
     payload = decode_access_token(token)

@@ -25,25 +25,27 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @router.post("/token", response_model=TokenResponse)
 async def login(
+    request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
 ):
     """OAuth2 compatible login, returns access token and sets session cookie."""
-    return await _do_login(response, form_data.username, form_data.password, db)
+    return await _do_login(request, response, form_data.username, form_data.password, db)
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login_json(
+    request: Request,
     response: Response,
     payload: TokenRequest,
     db: AsyncSession = Depends(get_db),
 ):
     """JSON login, returns access token and sets session cookie."""
-    return await _do_login(response, payload.username, payload.password, db)
+    return await _do_login(request, response, payload.username, payload.password, db)
 
 
-async def _do_login(response: Response, username: str, password: str, db: AsyncSession) -> TokenResponse:
+async def _do_login(request: Request, response: Response, username: str, password: str, db: AsyncSession) -> TokenResponse:
     res = await db.execute(select(AdminUser).where(AdminUser.username == username))
     admin = res.scalar_one_or_none()
     if not admin or not verify_password(password, admin.password_hash):
@@ -58,11 +60,17 @@ async def _do_login(response: Response, username: str, password: str, db: AsyncS
     await db.commit()
     token = create_access_token(admin.username, extra={"role": "admin"})
 
+    # Only mark the cookie Secure when the connection is actually HTTPS.
+    # A Secure cookie is dropped over plain HTTP, which would break the
+    # session (and the WebSocket log stream) on HTTP deployments.
+    secure = str(request.url.scheme).lower() == "https"
+
     # Set HttpOnly cookie for session
     set_auth_cookie(
         response,
         token,
         expires_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+        secure=secure,
     )
 
     return TokenResponse(access_token=token, username=admin.username)

@@ -115,25 +115,32 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-def set_auth_cookie(response: Response, token: str, expires_minutes: int = 1440) -> None:
-    """Set HttpOnly secure cookie with the auth token."""
+def set_auth_cookie(response: Response, token: str, expires_minutes: int = 1440, secure: bool = False) -> None:
+    """Set HttpOnly cookie with the auth token.
+
+    `secure` must be True only when the connection is actually HTTPS —
+    a Secure cookie is dropped by the browser over plain HTTP, which would
+    break the session (and the WebSocket log stream, which cannot send an
+    Authorization header) on HTTP deployments. Callers pass the scheme from
+    the login request.
+    """
     response.set_cookie(
         key="spider_token",
         value=token,
         max_age=expires_minutes * 60,
         httponly=True,
-        secure=True,  # Only over HTTPS (Railway provides HTTPS)
+        secure=secure,
         samesite="lax",
         path="/",
     )
 
 
-def clear_auth_cookie(response: Response) -> None:
+def clear_auth_cookie(response: Response, secure: bool = False) -> None:
     """Clear the auth cookie on logout."""
     response.delete_cookie(
         key="spider_token",
         httponly=True,
-        secure=True,
+        secure=secure,
         samesite="lax",
         path="/",
     )

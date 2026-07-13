@@ -185,10 +185,10 @@ async def login_page(request: Request):
 # JSON login alias at /api/login (matches the frontend's expected contract).
 # Delegates to the auth router's shared handler so behavior stays identical.
 @app.post("/api/login")
-async def api_login_alias(response: Response, payload: TokenRequest, db: AsyncSession = Depends(get_db)):
+async def api_login_alias(request: Request, response: Response, payload: TokenRequest, db: AsyncSession = Depends(get_db)):
     from app.api.auth import _do_login
 
-    return await _do_login(response, payload.username, payload.password, db)
+    return await _do_login(request, response, payload.username, payload.password, db)
 
 
 @app.get("/logout")
@@ -196,9 +196,10 @@ async def logout_page(request: Request, response: Response):
     """Logout - clear session and redirect to login."""
     # Clear session
     request.session.clear()
-    # Clear cookie
+    # Clear cookie (match the Secure flag to the connection scheme)
     from app.core.auth_middleware import clear_auth_cookie
-    clear_auth_cookie(response)
+    secure = str(request.url.scheme).lower() == "https"
+    clear_auth_cookie(response, secure=secure)
     return RedirectResponse(url="/login", status_code=302)
 
 

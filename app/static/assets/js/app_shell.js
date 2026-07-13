@@ -81,9 +81,9 @@
       const cur = document.documentElement.getAttribute("data-theme");
       const next = cur === "dark" ? "light" : "dark";
       document.documentElement.setAttribute("data-theme", next);
-      localStorage.setItem("spider_theme", next);
+      localStorage.setItem("theme", next);
     };
-    const saved = localStorage.getItem("spider_theme");
+    const saved = localStorage.getItem("theme");
     if (saved) document.documentElement.setAttribute("data-theme", saved);
 
     // Keyboard shortcuts: 1-8 switch sections; "[" collapses sidebar.
@@ -288,7 +288,13 @@
   function bindUserCards(root) {
     root.querySelectorAll("[data-act]").forEach((b) => {
       b.onclick = async () => {
-        const id = b.dataset.id;
+        // The data-id lives on the parent .user-card, not the button itself.
+        const card = b.closest(".user-card");
+        const id = card ? card.dataset.id : "";
+        if (!id || id === "undefined") {
+          toast("User reference missing", "err");
+          return;
+        }
         try {
           if (b.dataset.act === "config" || b.dataset.act === "qr") showUserQR(Number(id));
           else if (b.dataset.act === "copycfg") { const u = await api(`/users/${id}`); const d = await api(`/sub/${u.uuid}?format=json`); copyText(d.uris.join("\n"), "Config copied"); }
@@ -413,14 +419,27 @@
   }
 
   function bindInboundCards(root) {
-    root.querySelectorAll('[data-act="edit"]').forEach((b) => b.onclick = () => inboundForm(Number(b.dataset.id)));
+    const idOf = (b) => {
+      const card = b.closest("[data-id]");
+      const id = card ? card.dataset.id : "";
+      return (!id || id === "undefined") ? null : id;
+    };
+    root.querySelectorAll('[data-act="edit"]').forEach((b) => b.onclick = () => {
+      const id = idOf(b);
+      if (!id) { toast("Inbound reference missing", "err"); return; }
+      inboundForm(Number(id));
+    });
     root.querySelectorAll('[data-act="keys"]').forEach((b) => b.onclick = async () => {
-      try { await api(`/inbounds/${b.dataset.id}/regen-keys`, { method: "POST" }); toast("Reality keys regenerated"); renderInbounds(); }
+      const id = idOf(b);
+      if (!id) { toast("Inbound reference missing", "err"); return; }
+      try { await api(`/inbounds/${id}/regen-keys`, { method: "POST" }); toast("Reality keys regenerated"); renderInbounds(); }
       catch (e) { toast(e.message, "err"); }
     });
     root.querySelectorAll('[data-act="del"]').forEach((b) => b.onclick = async () => {
+      const id = idOf(b);
+      if (!id) { toast("Inbound reference missing", "err"); return; }
       if (!confirm("Delete inbound?")) return;
-      try { await api(`/inbounds/${b.dataset.id}`, { method: "DELETE" }); toast("Deleted"); renderInbounds(); }
+      try { await api(`/inbounds/${id}`, { method: "DELETE" }); toast("Deleted"); renderInbounds(); }
       catch (e) { toast(e.message, "err"); }
     });
   }
