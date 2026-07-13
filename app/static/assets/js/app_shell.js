@@ -340,7 +340,7 @@
         </div>
         <div class="field-row">
           <div class="field"><label>IP limit (0=∞)<input name="ip_limit" type="number" min="0" value="${u.ip_limit || 0}"></label></div>
-          <div class="field"><label>Inbound tags (comma separated, empty = all)<input name="inbound_tags" value="${esc((u.inbound_tags||[]).join ? u.inbound_tags.join(",") : esc(u.inbound_tags||""))}"></label></div>
+          <div class="field"><label>Inbound tags (comma separated, empty = all)<input name="inbound_tags" value="${esc(Array.isArray(u.inbound_tags) ? u.inbound_tags.join(",") : (u.inbound_tags || ""))}"></label></div>
         </div>
         <label class="switch"><input type="checkbox" name="enabled" ${u.enabled !== false ? "checked" : ""}> <span class="slider"></span></label> <span class="k">Enabled</span>
         <div class="modal-actions">
@@ -562,8 +562,9 @@
           <iframe class="browser-frame" id="b-frame" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"></iframe>
         </div>
         <p class="muted" style="color:var(--txt-dim);font-size:11px;margin-top:8px">
-          Embedded browser (iframe mode): navigation, back/forward, refresh, tabs and address/search work.
-          Cross-origin sites may block embedding (X-Frame-Options/CSP). Downloads/uploads and per-site cookies need the Electron build.</p>
+          Embedded browser: pages load through a same-origin proxy that strips
+          embed-blocking headers, so most sites render. Sites that hard-block
+          framing or require logged-in sessions may still be limited.</p>
       </div>`;
     const frame = $("#b-frame");
     const addr = $("#b-addr");
@@ -580,7 +581,10 @@
     const load = (url) => {
       if (!url) return;
       $("#b-load").classList.add("on");
-      frame.src = url; addr.value = url; chromeActive.url = url; renderChromeTabs();
+      // Route through the same-origin proxy so sites that block embedding
+      // (X-Frame-Options / CSP frame-ancestors) actually render.
+      const proxied = "/api/browser/proxy?url=" + encodeURIComponent(url);
+      frame.src = proxied; addr.value = url; chromeActive.url = url; renderChromeTabs();
     };
     frame.onload = () => { $("#b-load").classList.remove("on"); try { addr.value = frame.contentWindow.location.href; chromeActive.url = addr.value; } catch {} };
     frame.onerror = () => $("#b-load").classList.remove("on");
@@ -619,7 +623,7 @@
       tab.onclick = (e) => {
         if (e.target.dataset.close) { closeChromeTab(e.target.dataset.close); return; }
         chromeActive = chromeTabs.find((x) => x.id === tab.dataset.id); renderChromeTabs();
-        const f = $("#b-frame"); if (f) { f.src = chromeActive.url; $("#b-addr").value = chromeActive.url; }
+        const f = $("#b-frame"); if (f) { f.src = "/api/browser/proxy?url=" + encodeURIComponent(chromeActive.url); $("#b-addr").value = chromeActive.url; }
       };
     });
   }
@@ -628,7 +632,7 @@
     chromeTabs.splice(i, 1);
     if (chromeTabs.length === 0) addChromeTab("https://www.google.com");
     if (chromeActive && chromeActive.id === id) chromeActive = chromeTabs[Math.max(0, i - 1)];
-    renderChromeTabs(); const f = $("#b-frame"); if (f) f.src = chromeActive.url;
+    renderChromeTabs(); const f = $("#b-frame"); if (f) f.src = "/api/browser/proxy?url=" + encodeURIComponent(chromeActive.url);
   }
 
   /* ===================================================================
@@ -647,15 +651,17 @@
         </div>
         <p class="muted" style="font-size:12px">Live tail of xray stdout/stderr. If Xray failed to start, the exact parser error appears here.</p>
         ${last && last.error ? `<div class="error-text" style="white-space:pre-wrap;font-size:12px;margin-bottom:10px">${esc(last.error)}</div>` : ""}
-        <pre id="logs-box" class="codebox" style="min-height:50vh;max-height:70vh;overflow:auto;font-size:11px;background:#0a0008;border:1px solid var(--glass-brd);border-radius:10px;padding:12px;color:var(--neon-soft);font-family:'JetBrains Mono',monospace"></pre>
+        <pre id="logs-box" class="codebox" style="min-height:50vh;max-height:70vh;overflow:auto;font-size:11px;background:var(--code-bg);border:1px solid var(--glass-brd);border-radius:10px;padding:12px;color:var(--neon-soft);font-family:'JetBrains Mono',monospace"></pre>
       </div>`;
     const box = root.querySelector("#logs-box");
     let paused = false;
     let ws = null;
-    const token = localStorage.getItem("spider_token");
+    // Auth is carried by the HttpOnly spider_token cookie (auto-sent by the
+    // browser on the same-origin WS), so we deliberately do NOT put the JWT in
+    // the URL — that would leak it into browser/network logs and proxies.
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const connect = () => {
-      ws = new WebSocket(`${proto}//${location.host}/api/xray/logs/stream?token=${encodeURIComponent(token)}`);
+      ws = new WebSocket(`${proto}//${location.host}/api/xray/logs/stream`);
       ws.onmessage = (e) => { if (!paused) { box.textContent += e.data + "\n"; box.scrollTop = box.scrollHeight; } };
       ws.onclose = () => { if (!paused) setTimeout(connect, 2000); };
       ws.onerror = () => { try { ws.close(); } catch {} };
@@ -680,17 +686,19 @@
      SETTINGS (account, music, theme, telegram)
      =================================================================== */
   async function renderSettings(root) {
-    const s = await api("/settings");
+    let s = {};
+    try { s = await api("/settings") || {}; } catch (e) { toast("Failed to load settings", "err"); }
     const m = s.music || { enabled: false, volume: 70, random: false, track: "", files: [], prefix: "/musics/" };
     music = { enabled: m.enabled, volume: m.volume, random: m.random, track: m.track, files: m.files || [], prefix: m.prefix || "/musics/" };
+    const acc = s.settings || {};
     const tgHandle = "amirsplder";
     root.innerHTML = `
       <div class="panel glass" style="margin-top:16px">
         <h3>ACCOUNT</h3>
-        <div class="setting-row"><div><div class="k">Username</div><div class="sub">${esc(s.admin_username || "admin")}</div></div></div>
-        <div class="setting-row"><div><div class="k">Email</div><div class="sub">${esc(s.admin_email || "(none)")}</div></div></div>
-        <div class="setting-row"><div><div class="k">Data directory</div><div class="sub">${esc(s.data_dir || "/app/data")}</div></div></div>
-        <div class="setting-row"><div><div class="k">Log level</div><div class="sub">${esc(s.log_level || "INFO")}</div></div></div>
+        <div class="setting-row"><div><div class="k">Username</div><div class="sub">${esc(acc.admin_username || "admin")}</div></div></div>
+        <div class="setting-row"><div><div class="k">Email</div><div class="sub">${esc(acc.admin_email || "(none)")}</div></div></div>
+        <div class="setting-row"><div><div class="k">Data directory</div><div class="sub">${esc(acc.data_dir || "/app/data")}</div></div></div>
+        <div class="setting-row"><div><div class="k">Log level</div><div class="sub">${esc(acc.log_level || "INFO")}</div></div></div>
         <div class="setting-row" style="border:none">
           <button class="btn btn-sm" id="cred-open">Change credentials</button>
         </div>
@@ -752,7 +760,8 @@
       </div>`;
 
     // ----- credentials -----
-    root.querySelector("#cred-open").onclick = () => openModal(`
+    root.querySelector("#cred-open").onclick = () => {
+      openModal(`
       <h3>CHANGE CREDENTIALS</h3>
       <form id="cred-form" style="display:flex;flex-direction:column;gap:12px">
         <div class="field"><label>Current password<input type="password" name="current_password" required></label></div>
@@ -763,7 +772,7 @@
           <button type="submit" class="btn btn-primary neon">Update</button>
         </div>
       </form>`);
-    document.querySelector("#modal-card .modal-close").onclick = () => closeModal();
+      document.querySelector("#modal-card .modal-close").onclick = () => closeModal();
     document.querySelector("#cred-form").onsubmit = async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
@@ -774,6 +783,7 @@
       };
       try { await api("/auth/change-credentials", { method: "POST", body }); toast("Credentials updated"); closeModal(); }
       catch (e) { toast(e.message, "err"); }
+    };
     };
 
     // ----- music -----

@@ -332,15 +332,23 @@ class XrayProcessManager:
             self._last["returncode"] = rc
 
     async def _watchdog(self) -> None:
-        """Restart Xray if it exits unexpectedly (crash)."""
+        """Restart Xray if it exits unexpectedly (crash).
+
+        Gives up after a bounded number of consecutive failures so a
+        permanently-broken config/binary (e.g. missing binary, bad Reality
+        keys) doesn't retry forever and flood the logs.
+        """
         self._watchdog_task = asyncio.current_task()
         backoff = 1
+        consecutive_failures = 0
+        max_consecutive_failures = 10
         while not self._stopping:
             await asyncio.sleep(2)
             if self._stopping:
                 return
             if self.is_running():
                 backoff = 1
+                consecutive_failures = 0
                 continue
             # not running and we didn't stop it -> try restart
             if self._stopping:
@@ -349,7 +357,16 @@ class XrayProcessManager:
             ok = await self.start()
             if ok:
                 backoff = 1
+                consecutive_failures = 0
             else:
+                consecutive_failures += 1
+                if consecutive_failures >= max_consecutive_failures:
+                    log_xray(
+                        "watchdog.gave_up",
+                        reason=f"Xray failed to start {consecutive_failures} times; "
+                        "check config/binary. Manual restart required.",
+                    )
+                    return
                 await asyncio.sleep(min(backoff, 30))
                 backoff = min(backoff * 2, 30)
 

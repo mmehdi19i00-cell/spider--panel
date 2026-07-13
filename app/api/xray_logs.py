@@ -56,8 +56,23 @@ async def xray_config(_: AdminUser = Depends(get_current_admin)):
 # ---------------------------------------------------------------------------
 @router.websocket("/logs/stream")
 async def xray_logs_stream(ws: WebSocket):
-    # Auth: token query param (dashboard passes the same JWT)
-    token = ws.query_params.get("token") or ""
+    # Auth precedence: Authorization header (Bearer) > spider_token cookie >
+    # ?token= query param (legacy). We avoid requiring the token in the URL
+    # because that leaks the JWT into browser/network logs and proxies.
+    auth_header = ws.headers.get("authorization", "")
+    cookie = ws.headers.get("cookie", "")
+    token = ""
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
+    else:
+        # cookie is "k=v; k2=v2" — pull spider_token
+        for part in cookie.split(";"):
+            part = part.strip()
+            if part.startswith("spider_token="):
+                token = part[len("spider_token="):]
+                break
+    if not token:
+        token = ws.query_params.get("token") or ""  # legacy fallback
     from app.core.security import decode_access_token
 
     payload = decode_access_token(token)

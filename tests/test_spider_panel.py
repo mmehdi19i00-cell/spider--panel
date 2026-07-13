@@ -154,6 +154,49 @@ def test_authenticated_pages_render(tmp_db):
     assert r2.headers["location"] == "/login", r2.headers.get("location")
 
 
+def test_modal_container_present_for_add_flows(tmp_db):
+    """Regression: the console must contain a #modal / #modal-card element,
+    otherwise openModal() throws and Add User / Add Inbound crash
+    (the originally reported 'can't add user or inbound')."""
+    from app.main import app
+    from app.bootstrap import ensure_admin
+    import asyncio
+
+    async def _seed():
+        await init_db()
+        async with get_sessionmaker()() as s:
+            await ensure_admin(s)
+
+    asyncio.run(_seed())
+    c = TestClient(app, follow_redirects=False)
+    tok = c.post("/api/auth/token", data={"username": "admin", "password": "testpass123"}).json()["access_token"]
+    c.cookies.set("spider_token", tok)
+    r = c.get("/dashboard", headers={"Accept": "text/html"}, follow_redirects=False)
+    assert r.status_code == 200
+    assert 'id="modal"' in r.text, "missing #modal container (Add User/Inbound modal would crash)"
+    assert 'id="modal-card"' in r.text, "missing #modal-card container"
+
+
+def test_sub_page_self_contained_modal(tmp_db):
+    """The public /sub page is served raw (not via Jinja inheritance), so it
+    must carry its own modal container + openModal() helper."""
+    from app.main import app
+    from app.bootstrap import ensure_admin
+    import asyncio
+
+    async def _seed():
+        await init_db()
+        async with get_sessionmaker()() as s:
+            await ensure_admin(s)
+
+    asyncio.run(_seed())
+    c = TestClient(app, follow_redirects=False)
+    r = c.get("/sub", follow_redirects=False)
+    assert r.status_code == 200
+    assert 'id="modal"' in r.text and 'id="modal-card"' in r.text
+    assert "function openModal" in r.text, "/sub must define its own openModal (served raw)"
+
+
 
 # ---------------------------------------------------------------------------
 # Tests: security / reality
@@ -819,5 +862,46 @@ def test_api_login_authenticates(tmp_db):
     assert bad.status_code == 401
     # Generic message (no username enumeration), not a raw JS error.
     assert bad.json()["detail"] == "Invalid username or password"
+
+
+def test_browser_proxy_blocks_ssrf_and_bad_scheme(tmp_db):
+    """The embedded Chrome tab proxies pages server-side so they render in the
+    iframe. The proxy must reject private/loopback hosts (SSRF) and non-http(s)
+    schemes, and must return a permissive framing header so the iframe accepts it.
+    """
+    from app.main import app
+    from app.bootstrap import ensure_admin
+    import asyncio
+
+    async def _seed():
+        await init_db()
+        async with get_sessionmaker()() as s:
+            await ensure_admin(s)
+
+    asyncio.run(_seed())
+    c = TestClient(app, follow_redirects=False)
+    tok = c.post("/api/auth/token", data={"username": "admin", "password": "testpass123"}).json()["access_token"]
+    H = {"Authorization": f"Bearer {tok}"}
+    r = c.get("/api/browser/proxy?url=http://127.0.0.1:1/", headers=H, follow_redirects=False)
+    assert r.status_code == 403, r.status_code
+    r = c.get("/api/browser/proxy?url=file:///etc/passwd", headers=H, follow_redirects=False)
+    assert r.status_code == 400, r.status_code
+    r = c.get("/api/browser/proxy?url=https://example.com/", headers=H, follow_redirects=False)
+    assert r.status_code == 200, r.status_code
+    assert "Example Domain" in r.text
+    assert r.headers.get("x-frame-options", "").upper() == "ALLOWALL"
+    assert "api/browser/proxy" in r.text, "relative links must route through the proxy"
+
+
+def test_chrome_tab_loads_through_proxy(tmp_db):
+    """Regression: the Chrome section must route the iframe through the proxy
+    (not load the remote URL directly, which most sites block -> white page)."""
+    # The proxy URL is built inside app_shell.js (deferred script), so verify it
+    # there rather than in the dashboard HTML shell.
+    js_path = os.path.join(os.path.dirname(__file__), "..", "app", "static", "assets", "js", "app_shell.js")
+    with open(js_path, "r", encoding="utf-8") as f:
+        js = f.read()
+    assert '"/api/browser/proxy?url=" + encodeURIComponent' in js, \
+        "Chrome tab must proxy pages through /api/browser/proxy"
 
 

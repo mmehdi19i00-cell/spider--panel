@@ -18,6 +18,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.api import (
     auth,
+    browser,
     dashboard,
     domains,
     inbounds,
@@ -29,7 +30,6 @@ from app.api import (
     system,
     users,
     xray_logs,
-    remote,
 )
 from app.bootstrap import (
     ensure_admin,
@@ -148,7 +148,7 @@ class CSRFTokenMiddleware:
 templates = Jinja2Templates(directory="app/templates")
 
 # API routers
-for r in (auth, dashboard, domains, inbounds, news, qr, remote, settings_router, subscription, system, users, xray_logs):
+for r in (auth, browser, dashboard, domains, inbounds, news, qr, remote, settings_router, subscription, system, users, xray_logs):
     app.include_router(r.router)
 
 

@@ -64,6 +64,11 @@
     <footer class="sub-foot muted">Spider Panel · VLESS / Reality · Xray Core</footer>
   </main>
 
+  <!-- Modal (self-contained; this page is served raw, not via base.html) -->
+  <div id="modal" class="modal-backdrop" hidden>
+    <div class="modal glass" id="modal-card"></div>
+  </div>
+
   <script>
   (() => {
     "use strict";
@@ -103,6 +108,25 @@
     function copy(text, label) {
       navigator.clipboard.writeText(text).then(() => toast(label || "Copied")).catch(() => toast("Copy failed", "err"));
     }
+
+    // Modal helpers (self-contained — this page is served raw, not via base.html)
+    function openModal(html) {
+      const card = document.getElementById("modal-card");
+      const backdrop = document.getElementById("modal");
+      if (!card || !backdrop) return;
+      card.innerHTML = html;
+      backdrop.hidden = false;
+    }
+    function closeModal() {
+      const card = document.getElementById("modal-card");
+      const backdrop = document.getElementById("modal");
+      if (backdrop) backdrop.hidden = true;
+      if (card) card.innerHTML = "";
+    }
+    document.addEventListener("click", (e) => {
+      if (e.target.id === "modal") closeModal();
+      if (e.target.classList && e.target.classList.contains("modal-close")) closeModal();
+    });
 
     function getUUID() {
       const m = location.pathname.match(/\/sub\/([^/]+)/);

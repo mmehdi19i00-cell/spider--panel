@@ -19,6 +19,8 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from html.parser import HTMLParser
 
+from app.core.logging import log
+
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
@@ -142,6 +144,8 @@ def _fetch(query: str, limit: int) -> list[dict]:
         except Exception as e:  # network / parse failure -> try next source
             last_err = str(e)
             continue
+    if last_err:
+        log.warning("news: all %d feed(s) failed; last error: %s", len(feeds), last_err[:200])
     # All sources failed: return a friendly empty result (never crash the panel).
     return []
 

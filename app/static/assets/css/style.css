@@ -20,6 +20,7 @@
   --radius: 16px;
   --shadow-neon: 0 0 14px rgba(255, 26, 60, 0.55), 0 0 38px rgba(255, 26, 60, 0.22);
   --font: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  --code-bg: rgba(0, 0, 0, 0.35);
 }
 
 [data-theme="light"] {
@@ -34,7 +35,51 @@
   --txt: #2a0510;
   --txt-dim: #7a4452;
   --shadow-neon: 0 0 12px rgba(230, 0, 35, 0.35), 0 8px 30px rgba(0,0,0,0.10);
+  --code-bg: rgba(255, 255, 255, 0.85);
 }
+
+/* ===================== LIGHT THEME COMPONENT OVERRIDES =====================
+   The console (panel/card/nav/music/telegram/search/modal/code) reads its
+   colours from the CSS custom properties above, so most elements already flip
+   correctly. The rules below cover the few components that used hardcoded
+   dark colours or need extra contrast in light mode. Without these the toggle
+   left the panel half-dark / unreadable — that was the "broken dark mode". */
+[data-theme="light"] body { color: var(--txt); }
+[data-theme="light"] .bg-grid {
+  background-image: linear-gradient(rgba(230,0,35,.08) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(230,0,35,.08) 1px, transparent 1px);
+}
+[data-theme="light"] .codebox,
+[data-theme="light"] .news-box,
+[data-theme="light"] #logs-box {
+  background: rgba(255, 255, 255, 0.85);
+  color: #3a0a18;
+  border-color: rgba(230, 0, 35, 0.25);
+}
+[data-theme="light"] .nav-item { color: var(--txt-dim); }
+[data-theme="light"] .nav-item:hover { color: var(--txt); background: rgba(230,0,35,.08); }
+[data-theme="light"] .nav-item.active {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(230,0,35,.92), rgba(163,0,22,.85));
+  border-color: rgba(230,0,35,.4);
+  text-shadow: 0 0 8px rgba(163,0,22,.6);
+}
+[data-theme="light"] .panel,
+[data-theme="light"] .card,
+[data-theme="light"] .music-bar,
+[data-theme="light"] .tg-popup,
+[data-theme="light"] .modal {
+  border-color: rgba(230, 0, 35, 0.25);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.10);
+}
+[data-theme="light"] .search-pill { border-color: rgba(230,0,35,.4); color: var(--txt); }
+[data-theme="light"] .search-pill input { color: var(--txt); }
+[data-theme="light"] .switch .slider { background: rgba(230,0,35,.18); border-color: rgba(230,0,35,.3); }
+[data-theme="light"] .switch .slider::before { background: var(--txt-dim); }
+[data-theme="light"] .topbar-fixed { background: linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.4)); border-color: rgba(230,0,35,.18); }
+[data-theme="light"] .table td { border-bottom-color: rgba(230,0,35,.12); }
+[data-theme="light"] .table tr { border-color: rgba(230,0,35,.18); }
+[data-theme="light"] .skeleton-bar, [data-theme="light"] .skeleton-card { background: rgba(230,0,35,.12); }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
@@ -114,9 +159,12 @@ body {
 .btn:hover { transform: translateY(-1px); }
 .btn-primary.neon {
   background: linear-gradient(135deg, var(--neon), var(--neon-deep));
-  border: none; color: #fff; box-shadow: var(--shadow-neon); width: 100%; padding: 13px;
-  letter-spacing: 4px;
+  border: none; color: #fff; box-shadow: var(--shadow-neon); padding: 10px 16px;
+  letter-spacing: 2px;
 }
+/* Full-width only on the standalone login screen; in the console the Add buttons
+   must size to their content (mobile-friendly), not stretch to 100%. */
+.auth-form .btn-primary.neon { width: 100%; padding: 13px; letter-spacing: 4px; }
 .btn-primary.neon:hover { box-shadow: 0 0 22px var(--neon); }
 .btn-ghost { background: transparent; }
 .btn-ghost.danger { color: var(--bad); border-color: rgba(255,59,92,.4); }
@@ -204,7 +252,7 @@ body {
 
 .error-text { color: var(--bad); font-size: 13px; margin: 0; }
 .muted { color: var(--txt-dim); }
-.codebox { width: 100%; min-height: 90px; font-family: ui-monospace, menlo, monospace; font-size: 12px; background: rgba(0,0,0,.35); color: var(--neon-soft); border: 1px solid var(--glass-brd); border-radius: 8px; padding: 10px; white-space: pre-wrap; word-break: break-all; }
+.codebox { width: 100%; min-height: 90px; font-family: ui-monospace, menlo, monospace; font-size: 12px; background: var(--code-bg); color: var(--neon-soft); border: 1px solid var(--glass-brd); border-radius: 8px; padding: 10px; white-space: pre-wrap; word-break: break-all; }
 
 .only-mobile { display: none; }
 
