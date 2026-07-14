@@ -165,6 +165,11 @@
 
   .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 45; }
 
+  /* Key/value rows used in user/inbound cards — strong label contrast. */
+  .kv { display: flex; align-items: baseline; gap: 10px; padding: 4px 0; font-size: 13px; line-height: 1.5; }
+  .kv > span:first-child { color: var(--txt-dim); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; flex: 0 0 auto; min-width: 72px; }
+  .kv > span:last-child, .kv > code { color: var(--txt); font-weight: 500; flex: 1; min-width: 0; word-break: break-word; }
+
   /* Skeleton loading */
   .skeleton-wrap { display: grid; gap: 16px; max-width: 900px; }
   .skeleton-bar { height: 22px; border-radius: 8px; background: linear-gradient(90deg, rgba(255,26,60,.08), rgba(255,26,60,.2), rgba(255,26,60,.08)); background-size: 200% 100%; animation: sk 1.2s infinite; }
@@ -185,8 +190,21 @@
   .addr #b-go { flex: 0 0 auto; white-space: nowrap; }
   .browser-chrome .zoom-group,
   .browser-chrome #b-newtab { flex: 0 0 auto; }
-  .browser-frame-wrap { position: relative; border: 1px solid var(--glass-brd); border-top: none; border-radius: 0 0 12px 12px; overflow: hidden; background: #fff; height: 62vh; min-height: 380px; }
+  .browser-frame-wrap { position: relative; border: 1px solid var(--glass-brd); border-top: none; border-radius: 0 0 12px 12px; overflow: hidden; background: #fff; height: 62vh; min-height: 360px; }
   .browser-frame { width: 100%; height: 100%; border: 0; display: block; }
+  /* Chrome panel becomes a flex column so the frame fills remaining height. */
+  #chrome-panel { display: flex; flex-direction: column; min-height: 70vh; }
+  #chrome-panel .browser-frame-wrap { flex: 1 1 auto; height: auto; min-height: 360px; }
+  /* Landscape phone: dedicate maximum space to the embedded browser.
+     Shrink the topbar and let the frame fill the short viewport. */
+  @media (max-width: 1000px) and (orientation: landscape) {
+    .topbar-fixed { margin: 4px 8px 0; padding: 6px 12px; }
+    .topbar-fixed h2 { font-size: 15px; }
+    .console-content { padding-top: 8px; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+    #chrome-panel { min-height: 78vh; }
+    #chrome-panel .browser-frame-wrap { min-height: 300px; }
+    .music-bar { bottom: 6px; }
+  }
   .zoom-group { display: inline-flex; align-items: center; gap: 2px; }
   .zoom-level { font-size: 11px; font-family: ui-monospace, monospace; min-width: 46px; color: var(--txt-dim); }
   .browser-loading { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--neon), transparent); background-size: 40% 100%; background-repeat: no-repeat; animation: load 1s infinite; display: none; }
@@ -232,16 +250,18 @@
     .sidebar-fixed {
       position: fixed; left: 0; top: 0; bottom: 0;
       width: min(280px, 82vw); transform: translateX(-110%);
-      padding-top: calc(12px + env(safe-area-inset-top));
+      padding-top: calc(14px + env(safe-area-inset-top));
       height: 100vh; height: 100dvh;
-      background: linear-gradient(180deg, rgba(20,2,12,.92), rgba(10,0,8,.95));
-      box-shadow: 8px 0 30px rgba(0,0,0,.45);
+      /* Opaque dark background — no backdrop blur, so the music bar / content
+         never bleed through the sidebar on mobile. */
+      background: linear-gradient(180deg, #14020c, #0a0008);
+      box-shadow: 8px 0 30px rgba(0,0,0,.55);
     }
     .console.nav-open .sidebar-fixed { transform: none; }
     .console.collapsed .sidebar-fixed { width: min(280px, 82vw); }
     .console.collapsed .side-id, .console.collapsed .nav-label { display: revert; }
     .side-foot { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
-    .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 45; backdrop-filter: blur(2px); }
+    .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 45; }
     .music-bar { width: calc(100vw - 20px); left: 10px; }
   }
   @media (prefers-reduced-motion: reduce) {

@@ -553,7 +553,7 @@
   async function renderChrome(root) {
     if (chromeTabs.length === 0) addChromeTab("https://www.google.com");
     root.innerHTML = `
-      <div class="panel glass">
+      <div class="panel glass" id="chrome-panel">
         <h3>CHROME</h3>
         <div class="tabs" id="ctabs"></div>
         <div class="browser-chrome">

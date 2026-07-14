@@ -94,7 +94,7 @@
       --glass: rgba(255, 255, 255, 0.62);
       --glass-brd: rgba(230, 0, 35, 0.30);
       --txt: #2a0510;
-      --txt-dim: #7a4452;
+      --txt-dim: #5a2a3a;
       --shadow-neon: 0 0 12px rgba(230, 0, 35, 0.35), 0 8px 30px rgba(0,0,0,0.10);
     }
     [data-theme="light"] body {
@@ -153,12 +153,13 @@
     .btn-primary.neon {
       background: linear-gradient(135deg, var(--neon), var(--neon-deep));
       border: none; color: #fff; box-shadow: var(--shadow-neon); width: 100%; padding: 13px;
-      letter-spacing: 4px;
+      letter-spacing: 2px;
     }
     .btn-primary.neon:hover { box-shadow: 0 0 22px var(--neon); }
     .btn-ghost { background: transparent; }
     .btn-ghost.danger { color: var(--bad); border-color: rgba(255,59,92,.4); }
-    .btn-sm { padding: 6px 10px; font-size: 12px; }
+    .btn-sm { padding: 8px 12px; font-size: 12px; letter-spacing: .5px; }
+    .btn-sm.btn-primary.neon { width: auto; padding: 8px 14px; letter-spacing: 1px; white-space: nowrap; }
     .btn-ok { background: rgba(43,255,136,.12); border-color: rgba(43,255,136,.4); color: var(--ok); }
     .btn-min { min-height: 48px; min-width: 48px; display: flex; align-items: center; justify-content: center; }
 
@@ -349,6 +350,15 @@
       .tg-popup { width: 260px; }
     }
 
+    /* On mobile the title sits in the topbar; move the Telegram FAB out of
+       its way (top-center -> top-right) so it can't overlap page titles. */
+    @media (max-width: 820px) {
+      .tg-wrap { left: auto; right: 12px; top: 10px; transform: none; }
+      .tg-popup { left: auto; right: 0; transform-origin: top right; }
+      /* Give the topbar title breathing room so it never sits under the FAB. */
+      .topbar-fixed { padding-right: 60px; }
+    }
+
     /* Mobile-first app shell */
     .app-shell { display: grid; grid-template-columns: 1fr; min-height: 100vh; }
     .main { display: flex; flex-direction: column; min-width: 0; margin-left: 0; }
@@ -366,9 +376,9 @@
     .grid { display: grid; gap: 14px; }
     .cards { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
     .card { padding: 16px; border-radius: 16px; }
-    .card .k { font-size: 12px; color: var(--txt-dim); letter-spacing: 1px; text-transform: uppercase; }
+    .card .k { font-size: 12px; color: var(--txt-dim); letter-spacing: 1px; text-transform: uppercase; font-weight: 700; }
     .card .v { font-size: 28px; font-weight: 800; margin-top: 6px; color: var(--neon); text-shadow: 0 0 12px rgba(255,26,60,.5); }
-    .card .sub { font-size: 12px; color: var(--txt-dim); margin-top: 4px; }
+    .card .sub { font-size: 12px; color: var(--txt-dim); margin-top: 4px; font-weight: 500; }
 
     .panel { padding: 18px; margin-top: 16px; }
     .panel h3 { margin: 0 0 14px; letter-spacing: 2px; font-size: 15px; color: var(--txt); }
@@ -540,14 +550,13 @@
         width: min(280px, 82vw); transform: translateX(-110%);
         transition: transform 0.28s cubic-bezier(.4,0,.2,1);
         margin: 0; border-radius: 0; height: 100vh; height: 100dvh;
-        padding-top: calc(88px + env(safe-area-inset-top));
-        background: linear-gradient(180deg, rgba(20,2,12,.92), rgba(10,0,8,.95));
-        backdrop-filter: blur(18px) saturate(140%);
-        -webkit-backdrop-filter: blur(18px) saturate(140%);
-        box-shadow: 8px 0 30px rgba(0,0,0,.45);
+        /* Solid (opaque) background so nothing bleeds through — no backdrop blur. */
+        padding-top: calc(14px + env(safe-area-inset-top));
+        background: linear-gradient(180deg, #14020c, #0a0008);
+        box-shadow: 8px 0 30px rgba(0,0,0,.55);
       }
       .console.nav-open .sidebar-fixed { transform: none; }
-      .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 55; backdrop-filter: blur(2px); }
+      .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 55; }
       .console.collapsed .sidebar-fixed { width: min(280px, 82vw); }
       .console.collapsed .side-id, .console.collapsed .nav-label { display: revert; }
       .console.collapsed .side-name { font-size: 13px; }

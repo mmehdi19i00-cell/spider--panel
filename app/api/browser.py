@@ -139,6 +139,38 @@ def _auth_html_error() -> HTMLResponse:
     )
 
 
+def _upstream_error_html(url: str, status_code: int) -> HTMLResponse:
+    """Friendly HTML when the remote site itself returns an error (4xx/5xx).
+
+    Previously this was a plain-text `Upstream returned HTTP 4xx` rendered raw
+    on a near-black iframe. Sites like Google can return 403/429 to server-side
+    fetches even with a browser UA; surface that as a readable message with a
+    retry hint rather than an opaque error string.
+    """
+    return HTMLResponse(
+        f"""<!doctype html><html data-theme="dark"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{{font-family:system-ui,Segoe UI,sans-serif;background:#0f0f12;color:#ffe9ee;
+       display:grid;place-items:center;height:100vh;margin:0;padding:24px;text-align:center}}
+  .card{{max-width:460px;padding:28px;border:1px solid rgba(255,26,60,.4);border-radius:16px;
+        background:rgba(28,4,12,.55);box-shadow:0 0 30px rgba(255,26,60,.25)}}
+  h2{{color:#ff1a3c;letter-spacing:2px;margin:0 0 10px}}
+  p{{color:#c79aa6;line-height:1.6;margin:8px 0}}
+  code{{color:#fff;font-size:12px;word-break:break-all}}
+  a{{display:inline-block;margin-top:16px;padding:10px 18px;border-radius:10px;
+     background:linear-gradient(135deg,#ff1a3c,#b3001b);color:#fff;text-decoration:none;font-weight:600}}
+</style></head><body><div class="card">
+  <h2>SITE UNAVAILABLE (HTTP {status_code})</h2>
+  <p>The site refused to load inside the embedded browser. Some sites block server-side proxying or require a logged-in session.</p>
+  <p>URL: <code>{url}</code></p>
+  <p>Try a different URL, or open the link directly in a new tab.</p>
+  <a href="https://www.google.com">Go to Google</a>
+</div></body></html>""",
+        status_code=502,
+    )
+
+
 @router.get("/proxy")
 async def browser_proxy(
     request: Request,
@@ -164,8 +196,11 @@ async def browser_proxy(
         return Response("Blocked: disallowed host", status_code=403)
 
     headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; SpiderPanelEmbeddedBrowser/1.0)",
-        "Accept": "*/*",
+        # A realistic desktop Chrome UA — some sites (notably Google) return
+        # 403/429 to non-browser user agents, which would show as an
+        # "Upstream returned HTTP 4xx" black screen in the embedded tab.
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
     }
     try:
@@ -175,7 +210,7 @@ async def browser_proxy(
             async with client.stream("GET", url, headers=headers) as resp:
                 _check_response_ips(resp)
                 if resp.status_code >= 400:
-                    return Response(f"Upstream returned HTTP {resp.status_code}", status_code=502)
+                    return _upstream_error_html(url, resp.status_code)
                 ctype = (resp.headers.get("content-type") or "text/html").lower()
                 data = b""
                 async for chunk in resp.aiter_bytes():
