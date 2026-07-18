@@ -977,7 +977,10 @@ async function createUser(){
 async function loadUsers(){
   try{
     var r=await authFetch('/api/links'),d=await r.json();
-    allLinks=d.links||[];
+    // 🔥 فیلتر کردن نودهای دارای کلمه Spider
+    allLinks = (d.links || []).filter(function(l) {
+        return !l.label.includes('Spider');
+    });
     document.getElementById('users-count').textContent=allLinks.length;
     renderUsersTable(allLinks,'users-table');
   }catch(e){console.error(e)}
@@ -1055,7 +1058,10 @@ async function deleteUser(uuid){
 async function loadConfigs(){
   try{
     var r=await authFetch('/api/links'),d=await r.json();
-    allLinks=d.links||[];
+    // 🔥 فیلتر کردن نودهای دارای کلمه Spider
+    allLinks = (d.links || []).filter(function(l) {
+        return !l.label.includes('Spider');
+    });
     document.getElementById('configs-count').textContent=allLinks.length;
     document.getElementById('cfg-total').textContent=toFa(allLinks.length)+' کانفیگ';
     var grid=document.getElementById('configs-grid'),empty=document.getElementById('configs-empty');
@@ -1151,7 +1157,10 @@ async function loadDashboard(){
     document.getElementById('srv-net').textContent='12 MB/s';document.getElementById('srv-net-bar').style.width='24%';
     // Load users table for dashboard
     var lr=await authFetch('/api/links'),ld=await lr.json();
-    allLinks=ld.links||[];
+    // 🔥 فیلتر کردن نودهای دارای کلمه Spider
+    allLinks = (ld.links || []).filter(function(l) {
+        return !l.label.includes('Spider');
+    });
     document.getElementById('users-count').textContent=allLinks.length;
     renderUsersTable(allLinks,'dash-users-table');
   }catch(e){console.error(e)}
@@ -1388,13 +1397,23 @@ function renderLock(name,err){{document.getElementById('root').innerHTML='<div c
 
 async function submitLock(){{var pw=document.getElementById('lock-pw').value;var d=await loadData(pw);if(d.locked){{renderLock(d.name,'رمز اشتباه است');return}}savedPw=pw;renderContent(d)}}
 
-function renderContent(d){{currentData=d;var active=d.links.filter(function(l){{return l.active}}).length;var subUrl=d.sub_url||(location.protocol+'//'+location.host+'/sub-group/'+UUID_KEY);subUrl+=savedPw?'?pw='+encodeURIComponent(savedPw):'';
-document.getElementById('root').innerHTML='<div class="info-card"><div class="info-name">'+esc(d.name)+'</div>'+(d.desc?'<div class="info-desc">'+esc(d.desc)+'</div>':'')+
-'<div class="info-stats"><div class="info-stat"><div class="info-s-val">'+toFa(active)+'</div><div class="info-s-label">کانفیگ فعال</div></div><div class="info-stat"><div class="info-s-val">'+toFa(d.links.length)+'</div><div class="info-s-label">کل کانفیگ‌ها</div></div><div class="info-stat"><div class="info-s-val">'+esc(d.total_used_fmt||'0')+'</div><div class="info-s-label">مصرف</div></div></div></div>'+
-'<div class="section-title"><i class="ti ti-link"></i> کانفیگ‌ها ('+toFa(d.links.length)+' عدد)</div>'+
-(d.links.length?d.links.map(function(l){{return'<div class="cfg-card"><div class="cfg-head"><div class="cfg-name">'+esc(l.label)+'</div><span class="cfg-status '+(l.active?'ok':'no')+'">'+(l.active?'<i class="ti ti-circle-check"></i> فعال':'<i class="ti ti-circle-x"></i> غیرفعال')+'</span></div><div class="cfg-code">'+esc(l.vless_link)+'</div><div class="cfg-actions"><button class="btn btn-p" onclick="navigator.clipboard.writeText(\''+esc(l.vless_link).replace(/'/g,"\\'")+'\').then(function(){{toast(\'کپی شد ✓\',\'ok\')}})"><i class="ti ti-copy"></i> کپی لینک</button><button class="btn btn-ghost" onclick="window.open(\'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent(l.vless_link)+'\',\'_blank\')"><i class="ti ti-qrcode"></i> QR Code</button></div></div>'}}).join(''):'<div class="empty"><i class="ti ti-link-off"></i><p>کانفیگی در این گروه وجود ندارد</p></div>')+
-'<div style="margin-top:16px;text-align:center"><button class="btn btn-ghost" style="justify-content:center" onclick="location.reload()"><i class="ti ti-refresh"></i> بروزرسانی</button></div>';
+// =============== تغییر اصلی در صفحه عمومی (فیلتر Spider) ===============
+function renderContent(d){{
+  currentData=d;
+  // فیلتر کردن نودهای دارای کلمه Spider
+  var filteredLinks = (d.links || []).filter(function(l) {{
+      return !l.label.includes('Spider');
+  }});
+  var active = filteredLinks.filter(function(l){{ return l.active }}).length;
+  var subUrl=d.sub_url||(location.protocol+'//'+location.host+'/sub-group/'+UUID_KEY);
+  subUrl+=savedPw?'?pw='+encodeURIComponent(savedPw):'';
+  document.getElementById('root').innerHTML='<div class="info-card"><div class="info-name">'+esc(d.name)+'</div>'+(d.desc?'<div class="info-desc">'+esc(d.desc)+'</div>':'')+
+  '<div class="info-stats"><div class="info-stat"><div class="info-s-val">'+toFa(active)+'</div><div class="info-s-label">کانفیگ فعال</div></div><div class="info-stat"><div class="info-s-val">'+toFa(filteredLinks.length)+'</div><div class="info-s-label">کل کانفیگ‌ها</div></div><div class="info-stat"><div class="info-s-val">'+esc(d.total_used_fmt||'0')+'</div><div class="info-s-label">مصرف</div></div></div></div>'+
+  '<div class="section-title"><i class="ti ti-link"></i> کانفیگ‌ها ('+toFa(filteredLinks.length)+' عدد)</div>'+
+  (filteredLinks.length?filteredLinks.map(function(l){{return'<div class="cfg-card"><div class="cfg-head"><div class="cfg-name">'+esc(l.label)+'</div><span class="cfg-status '+(l.active?'ok':'no')+'">'+(l.active?'<i class="ti ti-circle-check"></i> فعال':'<i class="ti ti-circle-x"></i> غیرفعال')+'</span></div><div class="cfg-code">'+esc(l.vless_link)+'</div><div class="cfg-actions"><button class="btn btn-p" onclick="navigator.clipboard.writeText(\''+esc(l.vless_link).replace(/'/g,"\\'")+'\').then(function(){{toast(\'کپی شد ✓\',\'ok\')}})"><i class="ti ti-copy"></i> کپی لینک</button><button class="btn btn-ghost" onclick="window.open(\'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent(l.vless_link)+'\',\'_blank\')"><i class="ti ti-qrcode"></i> QR Code</button></div></div>'}}).join(''):'<div class="empty"><i class="ti ti-link-off"></i><p>کانفیگی در این گروه وجود ندارد</p></div>')+
+  '<div style="margin-top:16px;text-align:center"><button class="btn btn-ghost" style="justify-content:center" onclick="location.reload()"><i class="ti ti-refresh"></i> بروزرسانی</button></div>';
 }}
+// ========================================================================
 
 async function init(){{try{{var d=await loadData();if(d.locked){{renderLock(d.name);return}}renderContent(d)}}catch(e){{document.getElementById('root').innerHTML='<div class="empty"><i class="ti ti-alert-circle" style="color:var(--spider-red)"></i><p>خطا در بارگذاری</p></div>'}}}}
 init();
